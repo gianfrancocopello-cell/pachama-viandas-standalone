@@ -112,11 +112,20 @@ window.__pvAdmin = window.__pvAdmin || {
     applyOverrides(next);
     this.notify();
   },
-  setImage(id, dataUrl) {
-    this.images = { ...this.images, [id]: dataUrl };
-    saveJSON(LS_IMAGES, this.images);
-    saveImagesToFirestore(this.images);
-    this.notify();
+  async setImage(id, file) {
+    if (!window.__storage) return;
+    try {
+      const ext = file.type.includes('png') ? 'png' : 'jpg';
+      const ref = window.__storage.ref(`pv_images/${id}.${ext}`);
+      await ref.put(file);
+      const url = await ref.getDownloadURL();
+      this.images = { ...this.images, [id]: url };
+      saveJSON(LS_IMAGES, this.images);
+      saveImagesToFirestore(this.images);
+      this.notify();
+    } catch (err) {
+      console.error('Error subiendo imagen:', err);
+    }
   },
   clearImage(id) {
     const next = { ...this.images };
@@ -415,13 +424,14 @@ function ImageField({ label, id }) {
   const A = useAdmin();
   const src = A.images[id];
   const inputRef = React.useRef(null);
+  const [uploading, setUploading] = React.useState(false);
 
-  const onPick = (e) => {
+  const onPick = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => A.setImage(id, reader.result);
-    reader.readAsDataURL(file);
+    setUploading(true);
+    await A.setImage(id, file);
+    setUploading(false);
   };
 
   return (
@@ -435,11 +445,12 @@ function ImageField({ label, id }) {
           {!src && 'foto'}
         </div>
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 6 }}>
-          <button onClick={() => inputRef.current.click()} style={{
+          <button onClick={() => inputRef.current.click()} disabled={uploading} style={{
             appearance: 'none', border: '1px solid var(--crema-line)', background: 'var(--hueso)',
             padding: '8px 12px', borderRadius: 10, fontSize: 12, fontWeight: 500,
-            cursor: 'pointer', fontFamily: 'inherit', color: 'var(--tierra)',
-          }}>{src ? 'Cambiar imagen' : 'Subir imagen'}</button>
+            cursor: uploading ? 'not-allowed' : 'pointer', fontFamily: 'inherit', color: 'var(--tierra)',
+            opacity: uploading ? 0.6 : 1,
+          }}>{uploading ? 'Subiendo...' : src ? 'Cambiar imagen' : 'Subir imagen'}</button>
           {src && (
             <button onClick={() => A.clearImage(id)} style={{
               appearance: 'none', border: 0, background: 'transparent',
