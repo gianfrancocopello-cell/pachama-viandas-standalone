@@ -63,7 +63,13 @@ function saveOverridesToFirestore(overrides) {
 }
 function saveImagesToFirestore(images) {
   if (!window.__db) return;
-  window.__db.doc(FS_IMAGES_DOC).set({ data: images }).catch(console.error);
+  window.__db.doc(FS_IMAGES_DOC).set(images, { merge: true }).catch(console.error);
+}
+function deleteImageFromFirestore(id) {
+  if (!window.__db) return;
+  const update = {};
+  update[id] = firebase.firestore.FieldValue.delete();
+  window.__db.doc(FS_IMAGES_DOC).update(update).catch(console.error);
 }
 
 // ---------- Admin store (singleton) ----------
@@ -89,7 +95,7 @@ window.__pvAdmin = window.__pvAdmin || {
     }, console.error);
     // Escuchar cambios en imágenes en tiempo real
     this._fsImgUnsub = window.__db.doc(FS_IMAGES_DOC).onSnapshot((snap) => {
-      const remote = snap.exists ? (snap.data().data || {}) : {};
+      const remote = snap.exists ? (snap.data() || {}) : {};
       this.images = remote;
       saveJSON(LS_IMAGES, remote);
       this.notify();
@@ -121,7 +127,12 @@ window.__pvAdmin = window.__pvAdmin || {
       const url = await ref.getDownloadURL();
       this.images = { ...this.images, [id]: url };
       saveJSON(LS_IMAGES, this.images);
-      saveImagesToFirestore(this.images);
+      // Solo guardar el campo nuevo, sin tocar los demás
+      if (window.__db) {
+        const update = {};
+        update[id] = url;
+        window.__db.doc(FS_IMAGES_DOC).set(update, { merge: true }).catch(console.error);
+      }
       this.notify();
     } catch (err) {
       console.error('Error subiendo imagen:', err);
@@ -132,7 +143,7 @@ window.__pvAdmin = window.__pvAdmin || {
     delete next[id];
     this.images = next;
     saveJSON(LS_IMAGES, next);
-    saveImagesToFirestore(next);
+    deleteImageFromFirestore(id);
     this.notify();
   },
   resetAll() {
