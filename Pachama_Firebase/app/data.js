@@ -1,7 +1,12 @@
 // Datos del menú del día — Pachama Viandas
 
 window.MENU_DATA = {
-  fecha: { dia: 'viernes', numero: 15, mes: 'mayo' },
+  get fecha() {
+    const d = new Date();
+    const dias = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
+    const meses = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+    return { dia: dias[d.getDay()], numero: d.getDate(), mes: meses[d.getMonth()] };
+  },
   home: {
     titleL1: 'Comida hecha',
     titleL2: 'en casa,',
@@ -43,28 +48,28 @@ window.MENU_DATA = {
     // OPCIÓN 1 — abundante
     ensaladas: {
       1: [
-        { id: 'e1-1', nombre: 'Bowl Pachama', desc: 'Quinoa, palta, pollo grillado, vegetales asados, semillas tostadas.', precio: 9800, tags: ['Sin TACC', 'Alta proteína'] },
-        { id: 'e1-2', nombre: 'César del campo', desc: 'Pollo grillado, mix de hojas, parmesano en escamas, croutones de masa madre.', precio: 9200, tags: ['Clásica'] },
-        { id: 'e1-3', nombre: 'Mediterránea XL', desc: 'Hojas verdes, tomates cherry confitados, aceitunas, huevo, atún, papas rústicas.', precio: 9500, tags: ['Abundante'] },
-        { id: 'e1-4', nombre: 'Caprese de la huerta', desc: 'Tomates de estación, mozzarella fior di latte, albahaca fresca, pan tostado.', precio: 8900, tags: ['Vegetariana'] },
+        { id: 'e1-1', nombre: 'Bowl Pachama', desc: 'Quinoa, palta, pollo grillado, vegetales asados, semillas tostadas.', precio: 9800, tags: [] },
+        { id: 'e1-2', nombre: 'César del campo', desc: 'Pollo grillado, mix de hojas, parmesano en escamas, croutones de masa madre.', precio: 9200, tags: [] },
+        { id: 'e1-3', nombre: 'Mediterránea XL', desc: 'Hojas verdes, tomates cherry confitados, aceitunas, huevo, atún, papas rústicas.', precio: 9500, tags: [] },
+        { id: 'e1-4', nombre: 'Caprese de la huerta', desc: 'Tomates de estación, mozzarella fior di latte, albahaca fresca, pan tostado.', precio: 8900, tags: [] },
       ],
       2: [
-        { id: 'e2-1', nombre: 'Verde simple', desc: 'Mix de hojas, zanahoria, tomate, pepino, vinagreta de la casa.', precio: 6400, tags: ['Liviana'] },
-        { id: 'e2-2', nombre: 'Quinoa básica', desc: 'Quinoa, palta, tomate cherry, semillas, limón.', precio: 6900, tags: ['Vegana'] },
-        { id: 'e2-3', nombre: 'Caprese chica', desc: 'Tomate, mozzarella, albahaca, oliva.', precio: 6800, tags: ['Vegetariana'] },
+        { id: 'e2-1', nombre: 'Verde simple', desc: 'Mix de hojas, zanahoria, tomate, pepino, vinagreta de la casa.', precio: 6400, tags: [] },
+        { id: 'e2-2', nombre: 'Quinoa básica', desc: 'Quinoa, palta, tomate cherry, semillas, limón.', precio: 6900, tags: [] },
+        { id: 'e2-3', nombre: 'Caprese chica', desc: 'Tomate, mozzarella, albahaca, oliva.', precio: 6800, tags: [] },
       ],
     },
     comidas: {
       1: [
-        { id: 'c1-1', nombre: 'Pollo al limón con puré rústico', desc: 'Suprema de pollo marinada al limón y romero, puré de papa con manteca y tomillo.', precio: 9400, tags: ['Sin TACC'] },
-        { id: 'c1-2', nombre: 'Lasagna de la abuela', desc: 'Pasta fresca, ragú de ternera cocido a fuego lento, bechamel y parmesano.', precio: 9900, tags: ['Casera'] },
-        { id: 'c1-3', nombre: 'Wok de ternera y vegetales', desc: 'Tiras de bife de chorizo, brócoli, morrón, zanahoria, salsa de soja y jengibre.', precio: 9600, tags: ['Picante leve'] },
-        { id: 'c1-4', nombre: 'Tarta de zapallo y cabra', desc: 'Masa de hojaldre casero, zapallo asado, queso de cabra, nueces y miel.', precio: 8900, tags: ['Vegetariana'] },
+        { id: 'c1-1', nombre: 'Pollo al limón con puré rústico', desc: 'Suprema de pollo marinada al limón y romero, puré de papa con manteca y tomillo.', precio: 9400, tags: [] },
+        { id: 'c1-2', nombre: 'Lasagna de la abuela', desc: 'Pasta fresca, ragú de ternera cocido a fuego lento, bechamel y parmesano.', precio: 9900, tags: [] },
+        { id: 'c1-3', nombre: 'Wok de ternera y vegetales', desc: 'Tiras de bife de chorizo, brócoli, morrón, zanahoria, salsa de soja y jengibre.', precio: 9600, tags: [] },
+        { id: 'c1-4', nombre: 'Tarta de zapallo y cabra', desc: 'Masa de hojaldre casero, zapallo asado, queso de cabra, nueces y miel.', precio: 8900, tags: [] },
       ],
       2: [
-        { id: 'c2-1', nombre: 'Pollo grillado y vegetales', desc: 'Suprema de pollo grillada, vegetales asados de estación.', precio: 6900, tags: ['Sin TACC'] },
-        { id: 'c2-2', nombre: 'Tarta del día', desc: 'Tarta de verduras de estación con masa casera.', precio: 6400, tags: ['Vegetariana'] },
-        { id: 'c2-3', nombre: 'Bowl liviano', desc: 'Arroz integral, vegetales salteados, huevo poché.', precio: 6800, tags: ['Liviana'] },
+        { id: 'c2-1', nombre: 'Pollo grillado y vegetales', desc: 'Suprema de pollo grillada, vegetales asados de estación.', precio: 6900, tags: [] },
+        { id: 'c2-2', nombre: 'Tarta del día', desc: 'Tarta de verduras de estación con masa casera.', precio: 6400, tags: [] },
+        { id: 'c2-3', nombre: 'Bowl liviano', desc: 'Arroz integral, vegetales salteados, huevo poché.', precio: 6800, tags: [] },
       ],
     },
   },

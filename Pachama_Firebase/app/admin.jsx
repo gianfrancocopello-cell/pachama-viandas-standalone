@@ -1,104 +1,11 @@
-// Admin module: auth + overrides (texts/numbers/images).
-// Overrides se sincronizan en tiempo real via Firebase Firestore.
-// Imágenes se suben a Firebase Storage y la URL se guarda en Firestore.
-// Sesión se guarda en localStorage (por dispositivo).
+// Admin module: auth + overrides (texts/numbers/images) persisted en localStorage.
 
 const ADMIN_EMAILS = ['gianfrancocopello@gmail.com', 'gracielaaideegarcia@gmail.com', 'copellopujol@gmail.com'];
+const LS_OVERRIDES = 'pv_overrides_v1';
+const LS_IMAGES = 'pv_images_v1';
 const LS_SESSION = 'pv_admin_session_v1';
-const LS_OVERRIDES_CACHE = 'pv_overrides_cache_v1'; // cache offline
 
-// ---------- Firebase init ----------
-const FIREBASE_CONFIG = {
-  apiKey: "AIzaSyBJ5B_ZZSkBI-B-WOoW9__m204b8eYlx8g",
-  authDomain: "pachama-viandas.firebaseapp.com",
-  projectId: "pachama-viandas",
-  storageBucket: "pachama-viandas.firebasestorage.app",
-  messagingSenderId: "156982878097",
-  appId: "1:156982878097:web:b3ce36d437607962dfc430"
-};
-
-let _db = null;
-let _storage = null;
-try {
-  if (!firebase.apps.length) firebase.initializeApp(FIREBASE_CONFIG);
-  _db = firebase.firestore();
-  _storage = firebase.storage();
-} catch(e) {
-  console.warn('[PV] Firebase no disponible, modo offline:', e);
-}
-
-// ---------- Firestore helpers (overrides) ----------
-function fsSetOverrides(overrides) {
-  if (!_db) return Promise.resolve();
-  return _db.collection('menu').doc('overrides')
-    .set({ data: JSON.stringify(overrides) })
-    .catch(e => console.error('[PV] Error escribiendo Firestore:', e));
-}
-
-function fsSubscribeOverrides(callback) {
-  if (!_db) return () => {};
-  return _db.collection('menu').doc('overrides')
-    .onSnapshot(
-      (doc) => {
-        try {
-          const raw = doc.exists ? doc.data()?.data : null;
-          callback(raw ? JSON.parse(raw) : {});
-        } catch(e) {
-          console.error('[PV] Error parseando Firestore:', e);
-          callback({});
-        }
-      },
-      (err) => console.error('[PV] Firestore onSnapshot error:', err)
-    );
-}
-
-// ---------- Firebase Storage + Firestore helpers (imágenes) ----------
-async function uploadImageToStorage(id, dataUrl) {
-  if (!_storage || !_db) throw new Error('Firebase no disponible');
-
-  // Convertir dataUrl a Blob
-  const res = await fetch(dataUrl);
-  const blob = await res.blob();
-  const ext = (blob.type.split('/')[1] || 'jpg').replace('jpeg', 'jpg');
-
-  // Subir a Storage
-  const ref = _storage.ref(`pv_images/${id}.${ext}`);
-  await ref.put(blob);
-
-  // Obtener URL pública permanente
-  const url = await ref.getDownloadURL();
-
-  // Guardar URL en Firestore (doc: menu/images)
-  await _db.collection('menu').doc('images')
-    .set({ [id]: url }, { merge: true });
-
-  return url;
-}
-
-function fsSubscribeImages(callback) {
-  if (!_db) return () => {};
-  return _db.collection('menu').doc('images')
-    .onSnapshot(
-      (doc) => { callback(doc.exists ? doc.data() : {}); },
-      (err) => console.error('[PV] Images onSnapshot error:', err)
-    );
-}
-
-function fsDeleteImage(id) {
-  if (!_db) return Promise.resolve();
-  return _db.collection('menu').doc('images')
-    .update({ [id]: firebase.firestore.FieldValue.delete() })
-    .catch(e => console.error('[PV] Error borrando imagen:', e));
-}
-
-function fsClearAllImages() {
-  if (!_db) return Promise.resolve();
-  return _db.collection('menu').doc('images')
-    .set({})
-    .catch(e => console.error('[PV] Error limpiando imágenes:', e));
-}
-
-// ---------- LocalStorage helpers ----------
+// ---------- Storage ----------
 function loadJSON(key, fallback) {
   try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : fallback; }
   catch { return fallback; }
@@ -111,10 +18,12 @@ function saveJSON(key, val) {
 function applyOverrides(overrides) {
   const D = window.MENU_DATA;
   if (!D || !D.__base) {
+    // Save a deep clone of original so we can reset
     D.__base = JSON.parse(JSON.stringify({
       home: D.home, opciones: D.opciones, platos: D.platos, arma: D.arma,
     }));
   }
+  // Reset from base, then re-apply overrides
   const base = D.__base;
   D.home = JSON.parse(JSON.stringify(base.home));
   D.opciones = JSON.parse(JSON.stringify(base.opciones));
@@ -146,51 +55,45 @@ function getByPath(obj, path) {
 
 // ---------- Admin store (singleton) ----------
 window.__pvAdmin = window.__pvAdmin || {
-  overrides: loadJSON(LS_OVERRIDES_CACHE, {}),
-  images: {},                          // ← se llena desde Firestore en tiempo real
-  session: loadJSON(LS_SESSION, null),
+  overrides: loadJSON(LS_OVERRIDES, {}),
+  images: loadJSON(LS_IMAGES, {}),
+  session: loadJSON(LS_SESSION, null), // { email }
   listeners: new Set(),
-  _unsubOverrides: null,
-  _unsubImages: null,
-
   notify() { this.listeners.forEach(fn => fn()); },
-
   setOverride(path, value) {
     this.overrides = { ...this.overrides, [path]: value };
-    saveJSON(LS_OVERRIDES_CACHE, this.overrides);
+    saveJSON(LS_OVERRIDES, this.overrides);
     applyOverrides(this.overrides);
     this.notify();
-    fsSetOverrides(this.overrides);
   },
   clearOverride(path) {
     const next = { ...this.overrides };
     delete next[path];
     this.overrides = next;
-    saveJSON(LS_OVERRIDES_CACHE, this.overrides);
+    saveJSON(LS_OVERRIDES, this.overrides);
     applyOverrides(this.overrides);
     this.notify();
-    fsSetOverrides(this.overrides);
   },
-
-  // Sube a Storage → guarda URL en Firestore → onSnapshot actualiza this.images
-  async setImage(id, dataUrl) {
-    await uploadImageToStorage(id, dataUrl);
+  setImage(id, dataUrl) {
+    this.images = { ...this.images, [id]: dataUrl };
+    saveJSON(LS_IMAGES, this.images);
+    this.notify();
   },
-
-  // Borra la URL de Firestore → onSnapshot actualiza this.images
-  async clearImage(id) {
-    await fsDeleteImage(id);
+  clearImage(id) {
+    const next = { ...this.images };
+    delete next[id];
+    this.images = next;
+    saveJSON(LS_IMAGES, this.images);
+    this.notify();
   },
-
   resetAll() {
     this.overrides = {};
-    saveJSON(LS_OVERRIDES_CACHE, {});
+    this.images = {};
+    saveJSON(LS_OVERRIDES, this.overrides);
+    saveJSON(LS_IMAGES, this.images);
     applyOverrides({});
     this.notify();
-    fsSetOverrides({});
-    fsClearAllImages();
   },
-
   login(email) {
     const normalized = email.trim().toLowerCase();
     if (ADMIN_EMAILS.includes(normalized)) {
@@ -207,29 +110,10 @@ window.__pvAdmin = window.__pvAdmin || {
     this.notify();
   },
   isAdmin() { return !!this.session; },
-
-  startSync() {
-    if (this._unsubOverrides) return;
-    // Escucha en tiempo real: overrides
-    this._unsubOverrides = fsSubscribeOverrides((overrides) => {
-      this.overrides = overrides;
-      saveJSON(LS_OVERRIDES_CACHE, overrides);
-      applyOverrides(overrides);
-      this.notify();
-    });
-    // Escucha en tiempo real: imágenes
-    this._unsubImages = fsSubscribeImages((images) => {
-      this.images = images;
-      this.notify();
-    });
-  },
 };
 
-// Aplicar cache local inmediatamente (render rápido sin esperar red)
+// Apply on load (once)
 applyOverrides(window.__pvAdmin.overrides);
-
-// Iniciar sincronización en tiempo real con Firestore
-window.__pvAdmin.startSync();
 
 // ---------- React hook ----------
 function useAdmin() {
@@ -482,32 +366,17 @@ function NumberField({ label, path, prefix = '$' }) {
   );
 }
 
-// ─── ImageField con Firebase Storage ───
 function ImageField({ label, id }) {
   const A = useAdmin();
   const src = A.images[id];
   const inputRef = React.useRef(null);
-  const [uploading, setUploading] = React.useState(false);
-  const [error, setError] = React.useState('');
 
   const onPick = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    setUploading(true);
-    setError('');
     const reader = new FileReader();
-    reader.onload = async () => {
-      try {
-        await A.setImage(id, reader.result);
-      } catch(err) {
-        setError('Error al subir. Intentá de nuevo.');
-        console.error(err);
-      } finally {
-        setUploading(false);
-      }
-    };
+    reader.onload = () => A.setImage(id, reader.result);
     reader.readAsDataURL(file);
-    e.target.value = '';
   };
 
   return (
@@ -518,30 +387,21 @@ function ImageField({ label, id }) {
           width: 70, height: 70, borderRadius: 12, flexShrink: 0, fontSize: 9,
           ...(src ? { backgroundImage: `url(${src})`, backgroundSize: 'cover', backgroundPosition: 'center' } : {}),
         }}>
-          {!src && (uploading ? '⏳' : 'foto')}
+          {!src && 'foto'}
         </div>
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 6 }}>
-          <button
-            onClick={() => !uploading && inputRef.current.click()}
-            disabled={uploading}
-            style={{
-              appearance: 'none', border: '1px solid var(--crema-line)', background: 'var(--hueso)',
-              padding: '8px 12px', borderRadius: 10, fontSize: 12, fontWeight: 500,
-              cursor: uploading ? 'not-allowed' : 'pointer',
-              fontFamily: 'inherit', color: uploading ? 'var(--tierra-soft)' : 'var(--tierra)',
-              opacity: uploading ? 0.7 : 1,
-            }}
-          >
-            {uploading ? 'Subiendo...' : src ? 'Cambiar imagen' : 'Subir imagen'}
-          </button>
-          {src && !uploading && (
+          <button onClick={() => inputRef.current.click()} style={{
+            appearance: 'none', border: '1px solid var(--crema-line)', background: 'var(--hueso)',
+            padding: '8px 12px', borderRadius: 10, fontSize: 12, fontWeight: 500,
+            cursor: 'pointer', fontFamily: 'inherit', color: 'var(--tierra)',
+          }}>{src ? 'Cambiar imagen' : 'Subir imagen'}</button>
+          {src && (
             <button onClick={() => A.clearImage(id)} style={{
               appearance: 'none', border: 0, background: 'transparent',
               fontSize: 11, color: 'var(--terracota)', cursor: 'pointer',
               padding: 0, textAlign: 'left', fontFamily: 'inherit',
             }}>Quitar imagen</button>
           )}
-          {error && <div style={{ fontSize: 11, color: 'var(--warn)' }}>{error}</div>}
         </div>
         <input ref={inputRef} type="file" accept="image/*" onChange={onPick} style={{ display: 'none' }} />
       </div>
@@ -827,7 +687,7 @@ function ArmaEditor() {
         fontSize: 11, color: 'var(--tierra-soft)', lineHeight: 1.5, marginBottom: 16,
         padding: 12, background: 'var(--terracota-soft)', borderRadius: 12,
       }}>
-        Podés editar los pasos del configurador "Arma tu ensalada": cambiar el título, la cantidad máxima a elegir, el subtítulo y la lista de opciones.
+        Podés editar los pasos del configurador “Arma tu ensalada”: cambiar el título, la cantidad máxima a elegir, el subtítulo y la lista de opciones.
       </div>
       <div style={{ marginBottom: 26 }}>
         <div className="pv-h3" style={{ fontSize: 18, marginBottom: 12 }}>Precio base</div>
