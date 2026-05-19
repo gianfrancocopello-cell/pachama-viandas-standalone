@@ -53,16 +53,53 @@ function getByPath(obj, path) {
   return cur;
 }
 
+// ---------- Firestore helpers ----------
+const FS_DOC = 'admin/overrides';
+const FS_IMAGES_DOC = 'admin/images';
+
+function saveOverridesToFirestore(overrides) {
+  if (!window.__db) return;
+  window.__db.doc(FS_DOC).set({ data: overrides }).catch(console.error);
+}
+function saveImagesToFirestore(images) {
+  if (!window.__db) return;
+  window.__db.doc(FS_IMAGES_DOC).set({ data: images }).catch(console.error);
+}
+
 // ---------- Admin store (singleton) ----------
 window.__pvAdmin = window.__pvAdmin || {
   overrides: loadJSON(LS_OVERRIDES, {}),
   images: loadJSON(LS_IMAGES, {}),
-  session: loadJSON(LS_SESSION, null), // { email }
+  session: loadJSON(LS_SESSION, null),
   listeners: new Set(),
+  _fsUnsub: null,
+  _fsImgUnsub: null,
   notify() { this.listeners.forEach(fn => fn()); },
+
+  // Conectar Firestore — llamado una vez al iniciar
+  connectFirestore() {
+    if (this._fsUnsub || !window.__db) return;
+    // Escuchar cambios en overrides en tiempo real
+    this._fsUnsub = window.__db.doc(FS_DOC).onSnapshot((snap) => {
+      const remote = snap.exists ? (snap.data().data || {}) : {};
+      this.overrides = remote;
+      saveJSON(LS_OVERRIDES, remote);
+      applyOverrides(remote);
+      this.notify();
+    }, console.error);
+    // Escuchar cambios en imágenes en tiempo real
+    this._fsImgUnsub = window.__db.doc(FS_IMAGES_DOC).onSnapshot((snap) => {
+      const remote = snap.exists ? (snap.data().data || {}) : {};
+      this.images = remote;
+      saveJSON(LS_IMAGES, remote);
+      this.notify();
+    }, console.error);
+  },
+
   setOverride(path, value) {
     this.overrides = { ...this.overrides, [path]: value };
     saveJSON(LS_OVERRIDES, this.overrides);
+    saveOverridesToFirestore(this.overrides);
     applyOverrides(this.overrides);
     this.notify();
   },
@@ -70,27 +107,32 @@ window.__pvAdmin = window.__pvAdmin || {
     const next = { ...this.overrides };
     delete next[path];
     this.overrides = next;
-    saveJSON(LS_OVERRIDES, this.overrides);
-    applyOverrides(this.overrides);
+    saveJSON(LS_OVERRIDES, next);
+    saveOverridesToFirestore(next);
+    applyOverrides(next);
     this.notify();
   },
   setImage(id, dataUrl) {
     this.images = { ...this.images, [id]: dataUrl };
     saveJSON(LS_IMAGES, this.images);
+    saveImagesToFirestore(this.images);
     this.notify();
   },
   clearImage(id) {
     const next = { ...this.images };
     delete next[id];
     this.images = next;
-    saveJSON(LS_IMAGES, this.images);
+    saveJSON(LS_IMAGES, next);
+    saveImagesToFirestore(next);
     this.notify();
   },
   resetAll() {
     this.overrides = {};
     this.images = {};
-    saveJSON(LS_OVERRIDES, this.overrides);
-    saveJSON(LS_IMAGES, this.images);
+    saveJSON(LS_OVERRIDES, {});
+    saveJSON(LS_IMAGES, {});
+    saveOverridesToFirestore({});
+    saveImagesToFirestore({});
     applyOverrides({});
     this.notify();
   },
@@ -112,8 +154,11 @@ window.__pvAdmin = window.__pvAdmin || {
   isAdmin() { return !!this.session; },
 };
 
-// Apply on load (once)
+// Aplicar overrides locales al iniciar (mientras carga Firestore)
 applyOverrides(window.__pvAdmin.overrides);
+
+// Conectar Firestore para sincronización en tiempo real
+window.__pvAdmin.connectFirestore();
 
 // ---------- React hook ----------
 function useAdmin() {
