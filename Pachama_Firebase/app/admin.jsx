@@ -54,8 +54,8 @@ function getByPath(obj, path) {
 }
 
 // ---------- Firestore helpers ----------
-const FS_DOC = 'admin/overrides';
-const FS_IMAGES_DOC = 'admin/images';
+const FS_DOC = 'menu/overrides';
+const FS_IMAGES_DOC = 'menu/images';
 
 function saveOverridesToFirestore(overrides) {
   if (!window.__db) return;
