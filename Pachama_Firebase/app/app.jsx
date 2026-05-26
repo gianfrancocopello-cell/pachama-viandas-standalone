@@ -3,6 +3,8 @@ const { useState, useEffect, useMemo, useRef } = React;
 // Reference admin module via getters — resolved at call time after all babel scripts load.
 const getAdmin = () => window.useAdmin();
 const Img = (props) => React.createElement(window.EditableImg, props);
+// Reference salad component from window scope (defined in salad.jsx)
+const ArmaEnsalada = (props) => React.createElement(window.ArmaEnsalada, props);
 
 const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
   "layout": "list",
