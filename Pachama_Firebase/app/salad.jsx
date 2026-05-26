@@ -1,200 +1,231 @@
-// Arma tu ensalada — 3 variaciones single-screen.
-// Recibe: {selecciones, onToggle, onPriceChange} y renderiza según `variant`.
+// Datos del menú del día — Pachama Viandas
 
-const { useMemo } = React;
+window.MENU_DATA = {
+  get fecha() {
+    const d = new Date();
+    const dias = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
+    const meses = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+    return { dia: dias[d.getDay()], numero: d.getDate(), mes: meses[d.getMonth()] };
+  },
+  home: {
+    titleL1: 'Comida hecha',
+    titleL2: 'en casa,',
+    titleL3: 'entregada hoy.',
+    desc: 'Elegí el menú del día. Pedís hasta las 12:30.',
+    delivery: 'Zona Industrial – Barrio Sur, Comodoro Rivadavia.',
+    hours: 'Entrega 12:00 – 13:30',
+    whatsapp: '+54 9 2974 27-9849',
+    logoOffset: { x: 0, y: 0 },
+    cerrado: false,
+    cerradoMensaje: 'Muchas gracias por su compra',
+    cerradoColor: '#c46a3c',
+    cerradoFont: 'Instrument Serif',
+    cerradoFontSize: 48,
+    comboTitulo: 'Comidas y Ensaladas',
+    comboBajada: 'El menú del día',
+    comboDescripcion: 'Elegí entre nuestras ensaladas y comidas preparadas hoy.',
+    comboPrecioDesde: 6400,
+  },
+  opciones: {
+    1: {
+      titulo: 'Opción 1',
+      bajada: 'Más abundante',
+      descripcion: 'Porciones generosas, pensadas para almuerzos completos.',
+      precioDesde: 8900,
+      categorias: ['ensaladas', 'comidas'],
+    },
+    2: {
+      titulo: 'Opción 2',
+      bajada: 'Más liviana',
+      descripcion: 'Porciones medianas a un mejor precio, ideales para el día a día.',
+      precioDesde: 6400,
+      categorias: ['ensaladas', 'comidas'],
+    },
+    3: {
+      titulo: 'Arma tu ensalada',
+      bajada: 'A tu gusto',
+      descripcion: 'Elegí base, proteína, toppings y aderezo. Una ensalada hecha por vos.',
+      precioDesde: 9200,
+      categorias: ['arma'],
+    },
+    4: {
+      titulo: 'Arma tu comida',
+      bajada: 'A tu gusto',
+      descripcion: 'Elegí guarnición, proteína, vegetales y salsa. Una comida hecha por vos.',
+      precioDesde: 9600,
+      categorias: ['armaComida'],
+    },
+  },
+  categorias: {
+    arma: { nombre: 'Arma tu ensalada', short: 'Arma' },
+    armaComida: { nombre: 'Arma tu comida', short: 'Arma' },
+    ensaladas: { nombre: 'Ensaladas', short: 'Ensaladas' },
+    comidas: { nombre: 'Comidas', short: 'Comidas' },
+  },
+  platos: {
+    // OPCIÓN 1 — abundante
+    ensaladas: {
+      1: [
+        { id: 'e1-1', nombre: 'Bowl Pachama', desc: 'Quinoa, palta, pollo grillado, vegetales asados, semillas tostadas.', precio: 9800, tags: [] },
+        { id: 'e1-2', nombre: 'César del campo', desc: 'Pollo grillado, mix de hojas, parmesano en escamas, croutones de masa madre.', precio: 9200, tags: [] },
+        { id: 'e1-3', nombre: 'Mediterránea XL', desc: 'Hojas verdes, tomates cherry confitados, aceitunas, huevo, atún, papas rústicas.', precio: 9500, tags: [] },
+        { id: 'e1-4', nombre: 'Caprese de la huerta', desc: 'Tomates de estación, mozzarella fior di latte, albahaca fresca, pan tostado.', precio: 8900, tags: [] },
+      ],
+      2: [
+        { id: 'e2-1', nombre: 'Verde simple', desc: 'Mix de hojas, zanahoria, tomate, pepino, vinagreta de la casa.', precio: 6400, tags: [] },
+        { id: 'e2-2', nombre: 'Quinoa básica', desc: 'Quinoa, palta, tomate cherry, semillas, limón.', precio: 6900, tags: [] },
+        { id: 'e2-3', nombre: 'Caprese chica', desc: 'Tomate, mozzarella, albahaca, oliva.', precio: 6800, tags: [] },
+      ],
+    },
+    comidas: {
+      1: [
+        { id: 'c1-1', nombre: 'Pollo al limón con puré rústico', desc: 'Suprema de pollo marinada al limón y romero, puré de papa con manteca y tomillo.', precio: 9400, tags: [] },
+        { id: 'c1-2', nombre: 'Lasagna de la abuela', desc: 'Pasta fresca, ragú de ternera cocido a fuego lento, bechamel y parmesano.', precio: 9900, tags: [] },
+        { id: 'c1-3', nombre: 'Wok de ternera y vegetales', desc: 'Tiras de bife de chorizo, brócoli, morrón, zanahoria, salsa de soja y jengibre.', precio: 9600, tags: [] },
+        { id: 'c1-4', nombre: 'Tarta de zapallo y cabra', desc: 'Masa de hojaldre casero, zapallo asado, queso de cabra, nueces y miel.', precio: 8900, tags: [] },
+      ],
+      2: [
+        { id: 'c2-1', nombre: 'Pollo grillado y vegetales', desc: 'Suprema de pollo grillada, vegetales asados de estación.', precio: 6900, tags: [] },
+        { id: 'c2-2', nombre: 'Tarta del día', desc: 'Tarta de verduras de estación con masa casera.', precio: 6400, tags: [] },
+        { id: 'c2-3', nombre: 'Bowl liviano', desc: 'Arroz integral, vegetales salteados, huevo poché.', precio: 6800, tags: [] },
+      ],
+    },
+  },
+  // Arma tu ensalada — solo en Opción 1
+  arma: {
+    base: 9200, // precio base
+    pasos: [
+      {
+        id: 'base',
+        titulo: 'Base',
+        sub: 'Elegí una',
+        max: 1,
+        opciones: [
+          { id: 'rucula', nombre: 'Rúcula' },
+          { id: 'lechuga', nombre: 'Lechuga' },
+          { id: 'zanahoria', nombre: 'Zanahoria' },
+        ],
+      },
+      {
+        id: 'proteina',
+        titulo: 'Proteína',
+        sub: 'Hasta 2',
+        max: 2,
+        opciones: [
+          { id: 'pollo', nombre: 'Pollo grillado' },
+          { id: 'atun', nombre: 'Atún' },
+          { id: 'camarones', nombre: 'Camarones' },
+        ],
+      },
+      {
+        id: 'toppings',
+        titulo: 'Toppings',
+        sub: 'Hasta 5',
+        max: 5,
+        opciones: [
+          { id: 'palta', nombre: 'Palta' },
+          { id: 'cherry', nombre: 'Tomate cherry' },
+          { id: 'zanahoria', nombre: 'Zanahoria' },
+          { id: 'pepino', nombre: 'Pepino' },
+          { id: 'cebolla', nombre: 'Cebolla morada' },
+          { id: 'maiz', nombre: 'Choclo' },
+          { id: 'queso', nombre: 'Queso feta' },
+          { id: 'semillas', nombre: 'Semillas tostadas' },
+          { id: 'nueces', nombre: 'Nueces' },
+          { id: 'arandanos', nombre: 'Arándanos' },
+        ],
+      },
+      {
+        id: 'aderezo',
+        titulo: 'Aderezo',
+        sub: 'Elegí uno',
+        max: 1,
+        opciones: [
+          { id: 'cesar', nombre: 'César de la casa' },
+          { id: 'mostaza', nombre: 'Mostaza y miel' },
+          { id: 'oliva', nombre: 'Oliva y limón' },
+          { id: 'balsamico', nombre: 'Balsámica' },
+          { id: 'yogur', nombre: 'Yogur y hierbas' },
+        ],
+      },
+    ],
+  },
+  // Arma tu comida — opción 4
+  armaComida: {
+    base: 9600,
+    pasos: [
+      {
+        id: 'guarnicion',
+        titulo: 'Guarnición',
+        sub: 'Elegí una',
+        max: 1,
+        opciones: [
+          { id: 'pure', nombre: 'Puré rústico' },
+          { id: 'papas', nombre: 'Papas asadas' },
+          { id: 'arroz', nombre: 'Arroz integral' },
+          { id: 'batata', nombre: 'Batata al horno' },
+        ],
+      },
+      {
+        id: 'proteina',
+        titulo: 'Proteína',
+        sub: 'Hasta 2',
+        max: 2,
+        opciones: [
+          { id: 'pollo', nombre: 'Pollo grillado' },
+          { id: 'ternera', nombre: 'Ternera al horno' },
+          { id: 'cerdo', nombre: 'Cerdo a las hierbas' },
+          { id: 'pescado', nombre: 'Pescado del día' },
+        ],
+      },
+      {
+        id: 'vegetales',
+        titulo: 'Vegetales',
+        sub: 'Hasta 4',
+        max: 4,
+        opciones: [
+          { id: 'brocoli', nombre: 'Brócoli salteado' },
+          { id: 'zapallo', nombre: 'Zapallo asado' },
+          { id: 'zanahoria', nombre: 'Zanahoria glaseada' },
+          { id: 'morron', nombre: 'Morrones asados' },
+          { id: 'champi', nombre: 'Champiñones salteados' },
+          { id: 'chauchas', nombre: 'Chauchas al ajillo' },
+        ],
+      },
+      {
+        id: 'salsa',
+        titulo: 'Salsa',
+        sub: 'Elegí una',
+        max: 1,
+        opciones: [
+          { id: 'limon', nombre: 'Limón y hierbas' },
+          { id: 'bbq', nombre: 'BBQ casera' },
+          { id: 'champi', nombre: 'Crema de champiñones' },
+          { id: 'mostaza', nombre: 'Mostaza y miel' },
+          { id: 'natural', nombre: 'Jugo natural' },
+        ],
+      },
+    ],
+  },
+};
 
-function ArmaEnsalada({ variant = 'lista', selecciones, onToggle }) {
-  const arma = window.MENU_DATA.arma;
+window.formatPrecio = (n) => {
+  return '$' + n.toLocaleString('es-AR');
+};
 
-  if (variant === 'cards') return <ArmaCards arma={arma} sel={selecciones} onToggle={onToggle} />;
-  return <ArmaLista arma={arma} sel={selecciones} onToggle={onToggle} />;
-}
-
-// ---------- VARIACIÓN A: Bowl visual central ----------
-function ArmaBowl({ arma, sel, onToggle }) {
-  const allSelections = useMemo(() => {
-    return arma.pasos.flatMap((p) =>
-      (sel[p.id] || []).map((id) => ({ paso: p.id, id }))
-    );
-  }, [sel, arma.pasos]);
-
-  // Genera puntos en el bowl, color por paso
-  const colorFor = (paso) => ({
-    base: 'oklch(0.6 0.1 130)',
-    proteina: 'oklch(0.55 0.12 40)',
-    toppings: 'oklch(0.7 0.13 70)',
-    aderezo: 'oklch(0.85 0.08 90)',
-  }[paso] || 'oklch(0.6 0.05 50)');
-
-  return (
-    <div>
-      {/* Bowl visual */}
-      <div className="pv-bowl-wrap">
-        <div className="pv-bowl-bg" />
-        {allSelections.length === 0 && (
-          <div className="pv-bowl-empty"><div>Tu bowl vacío<br/>empezá eligiendo una base</div></div>
-        )}
-        <div className="pv-bowl-fill">
-          {allSelections.map((s, i) => (
-            <div
-              key={s.paso + s.id}
-              className="pv-bowl-dot"
-              style={{
-                background: colorFor(s.paso),
-                width: s.paso === 'base' ? 28 : s.paso === 'proteina' ? 24 : 16,
-                height: s.paso === 'base' ? 28 : s.paso === 'proteina' ? 24 : 16,
-                transform: `rotate(${i * 23}deg)`,
-              }}
-            />
-          ))}
-        </div>
-      </div>
-
-      {/* Pasos */}
-      {arma.pasos.map((paso) => (
-        <div key={paso.id} style={{ marginTop: 22 }}>
-          <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 10 }}>
-            <div>
-              <div className="pv-h3" style={{ fontSize: 20 }}>{paso.titulo}</div>
-              <div className="pv-meta">{paso.sub}</div>
-            </div>
-            <div style={{ fontSize: 12, color: 'var(--tierra-soft)' }}>
-              {(sel[paso.id] || []).length}/{paso.max}
-            </div>
-          </div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-            {paso.opciones.map((op) => {
-              const active = (sel[paso.id] || []).includes(op.id);
-              return (
-                <button
-                  key={op.id}
-                  className={`pv-chip ${paso.id === 'base' || paso.id === 'toppings' ? 'pv-chip-veg' : ''}`}
-                  aria-pressed={active}
-                  onClick={() => onToggle(paso.id, op.id, paso.max)}
-                >
-                  {op.nombre}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-// ---------- VARIACIÓN B: Lista compacta con resumen sticky ----------
-function ArmaLista({ arma, sel, onToggle }) {
-  const totalSel = arma.pasos.reduce((a, p) => a + (sel[p.id] || []).length, 0);
-
-  return (
-    <div>
-      {/* Resumen */}
-      <div className="pv-card" style={{ background: 'var(--terracota-soft)', borderColor: 'transparent', marginBottom: 14 }}>
-        <div className="pv-eyebrow" style={{ color: 'oklch(0.42 0.1 40)' }}>Tu ensalada</div>
-        <div className="pv-h3" style={{ fontSize: 22, marginTop: 4, color: 'oklch(0.32 0.08 40)' }}>
-          {totalSel === 0 ? 'Empezá a armarla' : `${totalSel} ${totalSel === 1 ? 'ingrediente' : 'ingredientes'}`}
-        </div>
-        {totalSel > 0 && (
-          <div style={{ marginTop: 10, fontSize: 12, color: 'oklch(0.32 0.08 40)', lineHeight: 1.5 }}>
-            {arma.pasos.map((p) => {
-              const items = (sel[p.id] || []).map((id) => p.opciones.find((o) => o.id === id)?.nombre).join(' · ');
-              return items ? <div key={p.id}><b style={{ fontWeight: 600 }}>{p.titulo}:</b> {items}</div> : null;
-            })}
-          </div>
-        )}
-      </div>
-
-      {/* Pasos como filas compactas */}
-      {arma.pasos.map((paso, i) => (
-        <div key={paso.id} style={{ marginTop: i === 0 ? 0 : 18 }}>
-          <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 8 }}>
-            <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
-              <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--terracota)' }}>0{i+1}</span>
-              <span className="pv-h3" style={{ fontSize: 18 }}>{paso.titulo}</span>
-            </div>
-            <span style={{ fontSize: 11, color: 'var(--tierra-soft)' }}>{paso.sub}</span>
-          </div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-            {paso.opciones.map((op) => {
-              const active = (sel[paso.id] || []).includes(op.id);
-              return (
-                <button
-                  key={op.id}
-                  className="pv-chip"
-                  aria-pressed={active}
-                  style={{ fontSize: 12, padding: '6px 12px' }}
-                  onClick={() => onToggle(paso.id, op.id, paso.max)}
-                >
-                  {active && '✓ '}{op.nombre}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-// ---------- VARIACIÓN C: Cards con imágenes ----------
-function ArmaCards({ arma, sel, onToggle }) {
-  return (
-    <div>
-      <div style={{ marginBottom: 16 }}>
-        <div className="pv-eyebrow">Arma tu ensalada</div>
-        <div className="pv-h2" style={{ marginTop: 4 }}>Cada<br/>ingrediente.</div>
-      </div>
-
-      {arma.pasos.map((paso) => {
-        const count = (sel[paso.id] || []).length;
-        return (
-          <div key={paso.id} style={{ marginTop: 22 }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-              <div className="pv-h3" style={{ fontSize: 19 }}>{paso.titulo}</div>
-              <div className="pv-tag" style={{
-                background: count > 0 ? 'var(--terracota)' : 'var(--crema-deep)',
-                color: count > 0 ? 'var(--hueso)' : 'var(--tierra-soft)',
-              }}>
-                {count} de {paso.max}
-              </div>
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-              {paso.opciones.map((op) => {
-                const active = (sel[paso.id] || []).includes(op.id);
-                return (
-                  <button
-                    key={op.id}
-                    onClick={() => onToggle(paso.id, op.id, paso.max)}
-                    style={{
-                      appearance: 'none',
-                      background: active ? 'var(--terracota)' : 'var(--hueso)',
-                      color: active ? 'var(--hueso)' : 'var(--tierra)',
-                      border: '1px solid',
-                      borderColor: active ? 'var(--terracota)' : 'var(--crema-line)',
-                      borderRadius: 16,
-                      padding: 10,
-                      display: 'flex', flexDirection: 'column', gap: 8,
-                      textAlign: 'left', cursor: 'pointer',
-                      fontFamily: 'inherit',
-                    }}
-                  >
-                    <div className={`pv-img ${paso.id === 'base' || paso.id === 'toppings' ? 'pv-img-veg' : ''}`}
-                      style={{ width: '100%', aspectRatio: '1.4/1', borderRadius: 10, fontSize: 9,
-                              ...(active ? { opacity: 0.85 } : {})
-                      }}>
-                      foto
-                    </div>
-                    <div style={{ fontSize: 13, fontWeight: 500, lineHeight: 1.2 }}>{op.nombre}</div>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-Object.assign(window, { ArmaEnsalada });
+// Defaults de "Complementario" por plato.
+// Todos los platos (ensaladas + comidas, op 1 y 2) llegan con los 3 items visibles.
+// Excepción: nombres que mencionan "frutos secos" arrancan ocultos.
+['ensaladas', 'comidas'].forEach((cat) => {
+  [1, 2].forEach((op) => {
+    window.MENU_DATA.platos[cat][op].forEach((p) => {
+      const hideByDefault = p.nombre.toLowerCase().includes('frutos secos');
+      p.complementarios = hideByDefault ? [] : ['Salsa César', 'Sobrecito de limón', 'Tostaditas'];
+      p.complementarioVisible = !hideByDefault;
+      p.agotado = false;
+      // Cada plato tiene precios diferenciados por opción
+      if (p.precioOp1 == null) p.precioOp1 = p.precio;
+      if (p.precioOp2 == null) p.precioOp2 = Math.max(0, p.precio - 2000);
+    });
+  });
+});

@@ -86,10 +86,68 @@ function CartBar({ cart, onTap, label = 'Ver carrito' }) {
 
 // ════════════════ SCREENS ════════════════
 
+function DraggableLogo({ A, D }) {
+  const isAdmin = A.isAdmin();
+  const saved = D.home.logoOffset || { x: 0, y: 0 };
+  const [offset, setOffset] = useState(saved);
+  const [dragging, setDragging] = useState(false);
+  const startRef = useRef(null);
+  const offsetRef = useRef(saved);
+
+  // Re-sync when admin persists a new value (e.g. via "Reset")
+  useEffect(() => {
+    setOffset(saved);
+    offsetRef.current = saved;
+  }, [saved.x, saved.y]);
+
+  const onDown = (e) => {
+    if (!isAdmin) return;
+    e.preventDefault();
+    e.stopPropagation();
+    startRef.current = { x: e.clientX - offsetRef.current.x, y: e.clientY - offsetRef.current.y };
+    setDragging(true);
+  };
+
+  useEffect(() => {
+    if (!dragging) return;
+    const onMove = (e) => {
+      const newOff = { x: e.clientX - startRef.current.x, y: e.clientY - startRef.current.y };
+      offsetRef.current = newOff;
+      setOffset(newOff);
+    };
+    const onUp = () => {
+      setDragging(false);
+      A.setOverride('home.logoOffset', offsetRef.current);
+    };
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+    return () => {
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+    };
+  }, [dragging]);
+
+  return (
+    <img
+      className={`pv-home-hero-logo ${isAdmin ? 'pv-logo-editable' : ''} ${dragging ? 'pv-logo-dragging' : ''}`}
+      src={A.images[`logo.${window.__pvViewport}`] || A.images['logo'] || 'app/assets/logo.png'}
+      alt="Pachamama Viandas"
+      onPointerDown={onDown}
+      style={{
+        transform: `translate(${offset.x}px, ${offset.y}px)`,
+        cursor: isAdmin ? dragging ? 'grabbing' : 'grab' : 'default',
+        touchAction: isAdmin ? 'none' : 'auto'
+      }}
+      draggable={false} />);
+
+
+}
+
 // ── HOME ──
 function HomeScreen({ go, cart, onTapCart }) {
   const A = getAdmin();
   const D = window.MENU_DATA;
+  const cerrado = !!D.home.cerrado;
   return (
     <>
       <Header title="Pachamama Viandas" right={
@@ -104,8 +162,25 @@ function HomeScreen({ go, cart, onTapCart }) {
           </svg>
         </button>
       } />
+      {cerrado ? (
+        <div className="pv-body" style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          minHeight: '70vh', padding: '40px 24px', textAlign: 'center',
+        }}>
+          <div style={{
+            fontFamily: D.home.cerradoFont || 'Instrument Serif',
+            fontSize: (D.home.cerradoFontSize || 48) + 'px',
+            color: D.home.cerradoColor || 'var(--terracota)',
+            lineHeight: 1.15,
+            maxWidth: 720,
+          }}>
+            {D.home.cerradoMensaje || 'Cerrado por hoy'}
+          </div>
+        </div>
+      ) : (
+      <>
       <div className="pv-body pv-body-with-cart">
-        <div className="pv-home-hero" style={{ margin: "0px 100px 32px 0px" }}>
+        <div className="pv-home-hero" style={{ margin: "0px 0px 14px 0px", gap: "12px" }}>
           <div className="pv-home-hero-text">
             <div className="pv-eyebrow">Hoy · {D.fecha.dia} {D.fecha.numero} de {D.fecha.mes}</div>
             <div className="pv-h1" style={{ marginTop: 8 }}>
@@ -116,28 +191,41 @@ function HomeScreen({ go, cart, onTapCart }) {
               {D.home.desc}
             </div>
           </div>
-          <img className="pv-home-hero-logo" src="app/assets/logo.png" alt="Pachamama Viandas" />
         </div>
 
         {/* Opciones */}
         <div className="pv-options-grid">
-          {[1, 2, 3].map((n) => {
-            const op = D.opciones[n];
-            const isOne = n === 1;
+          {[0, 3, 4].filter((n) => {
+            if (n === 3 && D.opciones[3]?.oculto) return false;
+            if (n === 4 && D.opciones[4]?.oculto) return false;
+            return true;
+          }).map((n) => {
+            const isCombo = n === 0;
+            const op = isCombo ? {
+              titulo: D.home.comboTitulo || 'Comidas y Ensaladas',
+              bajada: D.home.comboBajada || 'El menú del día',
+              descripcion: D.home.comboDescripcion || 'Elegí entre nuestras ensaladas y comidas preparadas hoy.',
+              precioDesde: D.home.comboPrecioDesde ?? 6400,
+              categorias: ['ensaladas', 'comidas'],
+            } : D.opciones[n];
+            const isOne = isCombo;
             const isArma = n === 3;
+            const isArmaComida = n === 4;
             const onTap = isArma ?
             () => go({ screen: 'arma', opcion: 1, categoria: 'arma' }) :
-            () => go({ screen: 'menu', opcion: n, categoria: op.categorias[0] });
+            isArmaComida ?
+            () => go({ screen: 'armaComida', opcion: 1, categoria: 'armaComida' }) :
+            () => go({ screen: 'menu', opcion: 'all', categoria: op.categorias[0] });
             return (
               <div
                 key={n}
                 className="pv-card pv-card-tap"
                 onClick={onTap}
                 style={{
-                  background: isOne ? 'var(--tierra)' : isArma ? 'var(--verde-soft)' : 'var(--hueso)',
-                  color: isOne ? 'var(--hueso)' : isArma ? 'oklch(0.28 0.08 130)' : 'var(--tierra)',
-                  borderColor: isOne ? 'var(--tierra)' : isArma ? 'transparent' : 'var(--crema-line)',
-                  position: 'relative', overflow: 'hidden', padding: 22
+                  background: isOne ? 'var(--tierra)' : isArma ? 'var(--verde-soft)' : isArmaComida ? 'var(--terracota-soft)' : 'var(--hueso)',
+                  color: isOne ? 'var(--hueso)' : isArma ? 'oklch(0.28 0.08 130)' : isArmaComida ? 'oklch(0.32 0.08 40)' : 'var(--tierra)',
+                  borderColor: isOne ? 'var(--tierra)' : (isArma || isArmaComida) ? 'transparent' : 'var(--crema-line)',
+                  position: 'relative', overflow: 'hidden', padding: 22, borderWidth: "1px"
                 }}>
                 
                 <div style={{
@@ -147,6 +235,8 @@ function HomeScreen({ go, cart, onTapCart }) {
                   'oklch(0.36 0.05 50)' :
                   isArma ?
                   'radial-gradient(circle at 30% 30%, oklch(0.95 0.04 130) 0%, oklch(0.78 0.08 130) 100%)' :
+                  isArmaComida ?
+                  'radial-gradient(circle at 30% 30%, oklch(0.94 0.06 50) 0%, oklch(0.78 0.1 40) 100%)' :
                   'var(--crema-deep)',
                   opacity: isOne ? 0.6 : 1
                 }} />
@@ -161,16 +251,18 @@ function HomeScreen({ go, cart, onTapCart }) {
                   <div style={{ fontSize: 13, marginTop: 10, opacity: 0.75, maxWidth: 240, lineHeight: 1.4 }}>
                     {op.descripcion}
                   </div>
+                  {isArma && (
                   <div style={{
                     display: 'flex', alignItems: 'baseline', gap: 6, marginTop: 18
                   }}>
                     <span style={{ fontSize: 11, opacity: 0.7 }}>Desde</span>
-                    <span style={{ fontSize: 22, fontWeight: 600 }}>{window.formatPrecio(op.precioDesde)}</span>
+                    <span style={{ fontSize: 22, fontWeight: 600 }}>{window.formatPrecio(D.arma.base)}</span>
                   </div>
+                  )}
                   <div style={{
                     marginTop: 14, display: 'flex', gap: 6, flexWrap: 'wrap'
                   }}>
-                    {!isArma && op.categorias.map((c) =>
+                    {!isArma && !isArmaComida && op.categorias.map((c) =>
                     <span key={c} className="pv-tag" style={{
                       background: isOne ? 'oklch(0.36 0.05 50)' : 'var(--crema-deep)',
                       color: isOne ? 'var(--hueso)' : 'var(--tierra)'
@@ -181,6 +273,13 @@ function HomeScreen({ go, cart, onTapCart }) {
                     {isArma &&
                     <span className="pv-tag" style={{
                       background: 'oklch(0.32 0.08 130)', color: 'var(--hueso)'
+                    }}>
+                        Empezar →
+                      </span>
+                    }
+                    {isArmaComida &&
+                    <span className="pv-tag" style={{
+                      background: 'oklch(0.42 0.13 40)', color: 'var(--hueso)'
                     }}>
                         Empezar →
                       </span>
@@ -203,6 +302,8 @@ function HomeScreen({ go, cart, onTapCart }) {
         </div>
       </div>
       <CartBar cart={cart} onTap={onTapCart} />
+      </>
+      )}
     </>);
 
 }
@@ -211,9 +312,23 @@ function HomeScreen({ go, cart, onTapCart }) {
 function MenuScreen({ state, go, cart, onTapCart }) {
   getAdmin();
   const D = window.MENU_DATA;
-  const op = D.opciones[state.opcion];
+  const isAll = state.opcion === 'all';
+  const op = isAll ? {
+    titulo: D.home.comboTitulo || 'Comidas y Ensaladas',
+    bajada: D.home.comboBajada || 'El menú del día',
+    categorias: ['ensaladas', 'comidas'],
+  } : D.opciones[state.opcion];
   const cats = op.categorias;
   const cat = state.categoria;
+
+  // Cuando es "all", combinar platos de opción 1 + 2
+  const getPlatos = (c) => {
+    if (!isAll) return D.platos[c][state.opcion] || [];
+    return [
+      ...(D.platos[c][1] || []),
+      ...(D.platos[c][2] || []),
+    ];
+  };
 
   return (
     <>
@@ -227,7 +342,7 @@ function MenuScreen({ state, go, cart, onTapCart }) {
           <div className="pv-h2" style={{ marginTop: 4 }}>Hoy en el menú</div>
         </div>
 
-        {/* Tabs */}
+        {/* Tabs Ensaladas / Comidas */}
         <div className="pv-tabs" style={{ marginBottom: 18 }}>
           {cats.map((c) =>
           <div
@@ -248,7 +363,7 @@ function MenuScreen({ state, go, cart, onTapCart }) {
 
         {cat !== 'arma' &&
         <DishList
-          platos={D.platos[cat][state.opcion]}
+          platos={getPlatos(cat)}
           onTap={(p) => go({ ...state, screen: 'detalle', plato: p })} />
 
         }
@@ -290,9 +405,14 @@ function ArmaCallout({ onTap }) {
 }
 
 function DishList({ platos, onTap }) {
+  const visibles = platos.filter((p) => !p.oculto);
   return (
     <div className="pv-list-grid">
-      {platos.map((p) => <DishCard key={p.id} plato={p} onTap={() => onTap(p)} />)}
+      {visibles.length === 0 ? (
+        <div style={{ padding: '40px 20px', textAlign: 'center', color: 'var(--tierra-soft)', fontSize: 13 }}>
+          No hay platos disponibles en esta categoría.
+        </div>
+      ) : visibles.map((p) => <DishCard key={p.id} plato={p} onTap={() => onTap(p)} />)}
     </div>);
 
 }
@@ -302,6 +422,11 @@ function DishCard({ plato, onTap }) {
   const agotado = !!plato.agotado;
   const handleTap = agotado ? undefined : onTap;
   const wrapCls = `pv-card pv-card-tap${agotado ? ' pv-card-agotado' : ''}`;
+
+  const op1 = plato.precioOp1 ?? plato.precio;
+  const op2 = plato.precioOp2 ?? plato.precio;
+  const precioMenor = Math.min(op1, op2);
+  const mostrarPrecio = agotado ? 'No disponible' : `Desde ${window.formatPrecio(precioMenor)}`;
 
   const badge = agotado ?
   <div className="pv-agotado-badge"><span>Agotado</span></div> :
@@ -320,7 +445,7 @@ function DishCard({ plato, onTap }) {
             display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden'
           }}>{plato.desc}</div>
           <div style={{ marginTop: 8, fontSize: 14, fontWeight: 600, color: agotado ? 'var(--tierra-soft)' : 'var(--terracota)' }}>
-            {agotado ? 'No disponible' : window.formatPrecio(plato.precio)}
+            {mostrarPrecio}
           </div>
         </div>
       </div>);
@@ -340,7 +465,7 @@ function DishCard({ plato, onTap }) {
           }}>{plato.desc}</div>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 8 }}>
             <div style={{ fontSize: 15, fontWeight: 600, color: agotado ? 'var(--tierra-soft)' : 'var(--terracota)' }}>
-              {agotado ? 'No disponible' : window.formatPrecio(plato.precio)}
+              {mostrarPrecio}
             </div>
             <div style={{ display: 'flex', gap: 4 }}>
               {!agotado && plato.tags.slice(0, 1).map((t) => <span key={t} className="pv-tag pv-tag-veg">{t}</span>)}
@@ -356,25 +481,57 @@ function DishCard({ plato, onTap }) {
 function DetalleScreen({ state, go, cart, setCart }) {
   const p = state.plato;
   const [qty, setQty] = useState(1);
+  const [opcionElegida, setOpcionElegida] = useState(null); // 1 o 2
+  const [errorOpcion, setErrorOpcion] = useState(false);
   const compls = p.complementarios || [];
   const esEnsalada = !!p.complementarioVisible && compls.length > 0;
 
   const add = () => {
+    if (!opcionElegida) {
+      setErrorOpcion(true);
+      return;
+    }
+    const precioFinal = opcionElegida === 1 ? (p.precioOp1 ?? p.precio) : (p.precioOp2 ?? p.precio);
     setCart((c) => {
-      const existing = c.find((it) => it.id === p.id && !it.custom);
+      const cartId = `${p.id}-op${opcionElegida}`;
+      const existing = c.find((it) => it.id === cartId && !it.custom);
       if (existing) {
-        return c.map((it) => it.id === p.id && !it.custom ? { ...it, cantidad: it.cantidad + qty } : it);
+        return c.map((it) => it.id === cartId && !it.custom ? { ...it, cantidad: it.cantidad + qty } : it);
       }
-      return [...c, { id: p.id, nombre: p.nombre, precio: p.precio, cantidad: qty }];
+      return [...c, {
+        id: cartId,
+        nombre: `${p.nombre} (Opción ${opcionElegida})`,
+        precio: precioFinal,
+        cantidad: qty,
+      }];
     });
     go({ screen: 'menu', opcion: state.opcion, categoria: state.categoria });
   };
+
+  const precioOp1 = p.precioOp1 ?? p.precio;
+  const precioOp2 = p.precioOp2 ?? p.precio;
+  const precioMostrar = opcionElegida === 1 ? precioOp1 :
+    opcionElegida === 2 ? precioOp2 : p.precio;
 
   return (
     <>
       <Header onBack={() => go({ screen: 'menu', opcion: state.opcion, categoria: state.categoria })} title="Detalle" />
       <div className="pv-body" style={{ paddingBottom: 120 }}>
-        <Img id={`plato.${p.id}`} veg={true} style={{ height: 200, marginBottom: 18, fontSize: 11 }} />
+        <div style={{
+          maxWidth: 520, margin: '0 auto 18px',
+          background: 'var(--crema-deep)', borderRadius: 18, overflow: 'hidden',
+        }}>
+          <Img
+            id={`plato.${p.id}`}
+            veg={true}
+            style={{
+              width: '100%', aspectRatio: '4 / 3',
+              height: 'auto', borderRadius: 18, fontSize: 11,
+              backgroundSize: 'cover', backgroundPosition: 'center',
+            }}
+          />
+        </div>
+        <div style={{ maxWidth: 520, margin: '0 auto' }}>
         <div className="pv-h2">{p.nombre}</div>
         <div style={{ display: 'flex', gap: 6, marginTop: 10, flexWrap: 'wrap' }}>
           {p.tags.map((t) => <span key={t} className="pv-tag pv-tag-veg">{t}</span>)}
@@ -408,13 +565,63 @@ function DetalleScreen({ state, go, cart, setCart }) {
           </div>
         }
 
-        <div style={{ marginTop: 26, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        {/* Selector Opción 1 / Opción 2 */}
+        <div style={{ marginTop: 26 }}>
+          <div className="pv-eyebrow" style={{ marginBottom: 8 }}>Elegí una opción</div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+            {[1, 2].map((n) => {
+              const sel = opcionElegida === n;
+              const precioN = n === 1 ? precioOp1 : precioOp2;
+              return (
+                <button
+                  key={n}
+                  onClick={() => { setOpcionElegida(n); setErrorOpcion(false); }}
+                  style={{
+                    appearance: 'none', cursor: 'pointer', fontFamily: 'inherit',
+                    padding: '14px 16px',
+                    background: sel ? 'var(--terracota)' : 'var(--hueso)',
+                    color: sel ? 'var(--hueso)' : 'var(--tierra)',
+                    border: '1.5px solid',
+                    borderColor: sel ? 'var(--terracota)' :
+                      (errorOpcion ? 'oklch(0.55 0.2 28)' : 'var(--crema-line)'),
+                    borderRadius: 14,
+                    display: 'flex', alignItems: 'center', gap: 12,
+                    textAlign: 'left',
+                  }}
+                >
+                  <span style={{
+                    width: 20, height: 20, borderRadius: 999,
+                    border: '2px solid',
+                    borderColor: sel ? 'var(--hueso)' : 'var(--crema-line)',
+                    background: sel ? 'var(--hueso)' : 'transparent',
+                    boxShadow: sel ? `inset 0 0 0 4px var(--terracota)` : 'none',
+                    flexShrink: 0,
+                  }} />
+                  <span style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>
+                    <span style={{ fontWeight: 600, fontSize: 15 }}>Opción {n}</span>
+                    <span style={{ fontSize: 13, fontWeight: 500, opacity: sel ? 0.9 : 0.7 }}>
+                      {window.formatPrecio(precioN)}
+                    </span>
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+          {errorOpcion && (
+            <div style={{ fontSize: 12, color: 'oklch(0.5 0.2 28)', marginTop: 8 }}>
+              Por favor, seleccioná Opción 1 u Opción 2 para continuar.
+            </div>
+          )}
+        </div>
+
+        <div style={{ marginTop: 22, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div className="pv-stepper">
             <button onClick={() => setQty(Math.max(1, qty - 1))}>−</button>
             <span className="pv-stepper-val">{qty}</span>
             <button onClick={() => setQty(qty + 1)}>+</button>
           </div>
-          <div style={{ fontSize: 22, fontWeight: 600 }}>{window.formatPrecio(p.precio * qty)}</div>
+          <div style={{ fontSize: 22, fontWeight: 600 }}>{window.formatPrecio(precioMostrar * qty)}</div>
+        </div>
         </div>
       </div>
       <div className="pv-cart-bar" onClick={add}>
@@ -422,16 +629,25 @@ function DetalleScreen({ state, go, cart, setCart }) {
           <small>Agregar al pedido</small>
           <div style={{ fontWeight: 600, fontSize: 15, marginTop: 2 }}>Sumar {qty} {qty === 1 ? 'plato' : 'platos'}</div>
         </div>
-        <div style={{ fontSize: 15, fontWeight: 700 }}>{window.formatPrecio(p.precio * qty)}</div>
+        <div style={{ fontSize: 15, fontWeight: 700 }}>{window.formatPrecio(precioMostrar * qty)}</div>
       </div>
     </>);
 
 }
 
-// ── ARMA TU ENSALADA ──
-function ArmaScreen({ state, go, cart, setCart, variant }) {
-  const [sel, setSel] = useState({ base: [], proteina: [], toppings: [], aderezo: [] });
-  const arma = window.MENU_DATA.arma;
+// ── ARMA TU ENSALADA / ARMA TU COMIDA ──
+function ArmaScreen({ state, go, cart, setCart, variant, kind = 'ensalada' }) {
+  const dataKey = kind === 'comida' ? 'armaComida' : 'arma';
+  const arma = window.MENU_DATA[dataKey];
+  const labelTitulo = kind === 'comida' ? 'Arma tu comida' : 'Arma tu ensalada';
+  const labelCart = kind === 'comida' ? 'Comida a tu gusto' : 'Ensalada a tu gusto';
+
+  // Inicializar sel con los IDs de los pasos del config
+  const [sel, setSel] = useState(() => {
+    const obj = {};
+    arma.pasos.forEach((p) => { obj[p.id] = []; });
+    return obj;
+  });
 
   const toggle = (pasoId, opId, max) => {
     setSel((s) => {
@@ -447,17 +663,33 @@ function ArmaScreen({ state, go, cart, setCart, variant }) {
     });
   };
 
-  const completo = arma.pasos.every((p) => (sel[p.id] || []).length > 0);
+  const completo = (() => {
+    const pasosConSeleccion = arma.pasos.filter((p) => (sel[p.id] || []).length > 0).length;
+    const minimo = kind === 'comida' ? 1 : 3;
+    return pasosConSeleccion >= minimo;
+  })();
   const totalSel = arma.pasos.reduce((a, p) => a + (sel[p.id] || []).length, 0);
+
+  // Suma de precios extras de las opciones elegidas
+  const extras = arma.pasos.reduce((a, p) => {
+    const ids = sel[p.id] || [];
+    return a + ids.reduce((s, id) => {
+      const op = p.opciones.find((o) => o.id === id);
+      return s + (op?.precio || 0);
+    }, 0);
+  }, 0);
+  // Para "comida" no se usa precio base — el precio = suma de extras seleccionados
+  const baseAplicable = kind === 'comida' ? 0 : arma.base;
+  const precioTotal = baseAplicable + extras;
 
   const add = () => {
     const resumen = arma.pasos.map((p) =>
     (sel[p.id] || []).map((id) => p.opciones.find((o) => o.id === id)?.nombre).join(', ')
     ).filter(Boolean).join(' · ');
     setCart((c) => [...c, {
-      id: 'arma-' + Date.now(),
-      nombre: 'Ensalada a tu gusto',
-      precio: arma.base,
+      id: dataKey + '-' + Date.now(),
+      nombre: labelCart,
+      precio: precioTotal,
       cantidad: 1,
       custom: true,
       notas: resumen
@@ -467,9 +699,9 @@ function ArmaScreen({ state, go, cart, setCart, variant }) {
 
   return (
     <>
-      <Header onBack={() => go({ screen: 'home' })} title="Arma tu ensalada" />
+      <Header onBack={() => go({ screen: 'home' })} title={labelTitulo} />
       <div className="pv-body" style={{ paddingBottom: 140 }}>
-        <ArmaEnsalada variant={variant} selecciones={sel} onToggle={toggle} />
+        <ArmaEnsalada variant={variant} selecciones={sel} onToggle={toggle} arma={arma} kind={kind} />
       </div>
       <div className="pv-cart-bar" onClick={completo ? add : null} style={{
         opacity: completo ? 1 : 0.6, cursor: completo ? 'pointer' : 'not-allowed',
@@ -478,7 +710,7 @@ function ArmaScreen({ state, go, cart, setCart, variant }) {
         <div>
           <small style={{ opacity: 0.85 }}>{totalSel} ingredientes elegidos</small>
           <div style={{ fontWeight: 600, fontSize: 15, marginTop: 2 }}>
-            {completo ? `Agregar · ${window.formatPrecio(arma.base)}` : 'Completá los pasos'}
+            {completo ? `Agregar · ${window.formatPrecio(precioTotal)}` : (kind === 'comida' ? 'Elegí al menos 1 paso' : 'Elegí al menos 3 pasos')}
           </div>
         </div>
         <div style={{ width: 40, height: 40, borderRadius: 999,
@@ -494,8 +726,7 @@ function ArmaScreen({ state, go, cart, setCart, variant }) {
 // ── CARRITO ──
 function CarritoScreen({ go, cart, setCart }) {
   const subtotal = cart.reduce((a, i) => a + i.precio * i.cantidad, 0);
-  const envio = subtotal >= 9000 ? 0 : 900;
-  const total = subtotal + envio;
+  const total = subtotal;
 
   const upd = (idx, delta) => {
     setCart((c) => {
@@ -541,7 +772,6 @@ function CarritoScreen({ go, cart, setCart }) {
 
             <div style={{ marginTop: 22, padding: 18, background: 'var(--hueso)', border: '1px solid var(--crema-line)', borderRadius: 18 }}>
               <Row label="Subtotal" value={window.formatPrecio(subtotal)} />
-              <Row label={`Envío${envio === 0 ? ' (gratis)' : ''}`} value={envio === 0 ? 'Gratis' : window.formatPrecio(envio)} />
               <div style={{ height: 1, background: 'var(--crema-line)', margin: '12px 0' }} />
               <Row label="Total" value={window.formatPrecio(total)} bold />
             </div>
@@ -584,8 +814,7 @@ function CheckoutScreen({ go, cart, setCart }) {
   });
   const [errors, setErrors] = useState({ nombre: false, dir: false });
   const subtotal = cart.reduce((a, i) => a + i.precio * i.cantidad, 0);
-  const envio = subtotal >= 9000 ? 0 : 900;
-  const total = subtotal + envio;
+  const total = subtotal;
 
   const setF = (k, v) => {
     setForm((f) => ({ ...f, [k]: v }));
@@ -604,13 +833,13 @@ function CheckoutScreen({ go, cart, setCart }) {
             className="pv-input"
             value={form.nombre}
             onChange={(e) => setF('nombre', e.target.value)}
-            style={errors.nombre ? { borderColor: 'oklch(0.55 0.2 28)' } : {}}
-          />
-          {errors.nombre && (
-            <div style={{ fontSize: 12, color: 'oklch(0.5 0.2 28)', marginTop: 6 }}>
+            style={errors.nombre ? { borderColor: 'oklch(0.55 0.2 28)' } : {}} />
+          
+          {errors.nombre &&
+          <div style={{ fontSize: 12, color: 'oklch(0.5 0.2 28)', marginTop: 6 }}>
               Por favor, ingresá tu nombre.
             </div>
-          )}
+          }
         </div>
         <div className="pv-field">
           <label className="pv-label">Dirección</label>
@@ -618,13 +847,13 @@ function CheckoutScreen({ go, cart, setCart }) {
             className="pv-input"
             value={form.dir}
             onChange={(e) => setF('dir', e.target.value)}
-            style={errors.dir ? { borderColor: 'oklch(0.55 0.2 28)' } : {}}
-          />
-          {errors.dir && (
-            <div style={{ fontSize: 12, color: 'oklch(0.5 0.2 28)', marginTop: 6 }}>
+            style={errors.dir ? { borderColor: 'oklch(0.55 0.2 28)' } : {}} />
+          
+          {errors.dir &&
+          <div style={{ fontSize: 12, color: 'oklch(0.5 0.2 28)', marginTop: 6 }}>
               Por favor, ingresá la dirección de entrega.
             </div>
-          )}
+          }
         </div>
 
         <div className="pv-eyebrow" style={{ marginTop: 24, marginBottom: 4 }}>Pago</div>
@@ -659,7 +888,6 @@ function CheckoutScreen({ go, cart, setCart }) {
 
         <div style={{ marginTop: 22, padding: 16, background: 'var(--hueso)', border: '1px solid var(--crema-line)', borderRadius: 16 }}>
           <Row label="Subtotal" value={window.formatPrecio(subtotal)} />
-          <Row label={envio === 0 ? 'Envío (gratis)' : 'Envío'} value={envio === 0 ? 'Gratis' : window.formatPrecio(envio)} />
           <div style={{ height: 1, background: 'var(--crema-line)', margin: '10px 0' }} />
           <Row label="Total a pagar" value={window.formatPrecio(total)} bold />
         </div>
@@ -766,7 +994,8 @@ function App() {
     home: <HomeScreen go={go} cart={cart} onTapCart={onTapCart} />,
     menu: <MenuScreen state={state} go={go} cart={cart} onTapCart={onTapCart} />,
     detalle: <DetalleScreen state={state} go={go} cart={cart} setCart={setCart} />,
-    arma: <ArmaScreen state={state} go={go} cart={cart} setCart={setCart} variant={t.saladVariant} />,
+    arma: <ArmaScreen state={state} go={go} cart={cart} setCart={setCart} variant={t.saladVariant} kind="ensalada" />,
+    armaComida: <ArmaScreen state={state} go={go} cart={cart} setCart={setCart} variant={t.saladVariant} kind="comida" />,
     carrito: <CarritoScreen go={go} cart={cart} setCart={setCart} />,
     checkout: <CheckoutScreen go={go} cart={cart} setCart={setCart} />,
     confirm: <ConfirmScreen state={state} go={go} setCart={setCart} />,
@@ -776,7 +1005,7 @@ function App() {
 
   const labels = {
     home: '01 Home', menu: '02 Menú', detalle: '03 Detalle',
-    arma: '04 Arma tu ensalada', carrito: '05 Carrito', checkout: '06 Checkout', confirm: '07 Confirmación',
+    arma: '04 Arma tu ensalada', armaComida: '05 Arma tu comida', carrito: '06 Carrito', checkout: '07 Checkout', confirm: '08 Confirmación',
     login: '08 Admin login', admin: '09 Admin editor'
   };
 

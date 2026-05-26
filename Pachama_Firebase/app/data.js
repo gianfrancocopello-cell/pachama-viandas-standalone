@@ -15,6 +15,16 @@ window.MENU_DATA = {
     delivery: 'Zona Industrial – Barrio Sur, Comodoro Rivadavia.',
     hours: 'Entrega 12:00 – 13:30',
     whatsapp: '+54 9 2974 27-9849',
+    logoOffset: { x: 0, y: 0 },
+    cerrado: false,
+    cerradoMensaje: 'Muchas gracias por su compra',
+    cerradoColor: '#c46a3c',
+    cerradoFont: 'Instrument Serif',
+    cerradoFontSize: 48,
+    comboTitulo: 'Comidas y Ensaladas',
+    comboBajada: 'El menú del día',
+    comboDescripcion: 'Elegí entre nuestras ensaladas y comidas preparadas hoy.',
+    comboPrecioDesde: 6400,
   },
   opciones: {
     1: {
@@ -38,9 +48,17 @@ window.MENU_DATA = {
       precioDesde: 9200,
       categorias: ['arma'],
     },
+    4: {
+      titulo: 'Arma tu comida',
+      bajada: 'A tu gusto',
+      descripcion: 'Elegí guarnición, proteína, vegetales y salsa. Una comida hecha por vos.',
+      precioDesde: 9600,
+      categorias: ['armaComida'],
+    },
   },
   categorias: {
     arma: { nombre: 'Arma tu ensalada', short: 'Arma' },
+    armaComida: { nombre: 'Arma tu comida', short: 'Arma' },
     ensaladas: { nombre: 'Ensaladas', short: 'Ensaladas' },
     comidas: { nombre: 'Comidas', short: 'Comidas' },
   },
@@ -132,6 +150,63 @@ window.MENU_DATA = {
       },
     ],
   },
+  // Arma tu comida — opción 4
+  armaComida: {
+    base: 9600,
+    pasos: [
+      {
+        id: 'guarnicion',
+        titulo: 'Guarnición',
+        sub: 'Elegí una',
+        max: 1,
+        opciones: [
+          { id: 'pure', nombre: 'Puré rústico' },
+          { id: 'papas', nombre: 'Papas asadas' },
+          { id: 'arroz', nombre: 'Arroz integral' },
+          { id: 'batata', nombre: 'Batata al horno' },
+        ],
+      },
+      {
+        id: 'proteina',
+        titulo: 'Proteína',
+        sub: 'Hasta 2',
+        max: 2,
+        opciones: [
+          { id: 'pollo', nombre: 'Pollo grillado' },
+          { id: 'ternera', nombre: 'Ternera al horno' },
+          { id: 'cerdo', nombre: 'Cerdo a las hierbas' },
+          { id: 'pescado', nombre: 'Pescado del día' },
+        ],
+      },
+      {
+        id: 'vegetales',
+        titulo: 'Vegetales',
+        sub: 'Hasta 4',
+        max: 4,
+        opciones: [
+          { id: 'brocoli', nombre: 'Brócoli salteado' },
+          { id: 'zapallo', nombre: 'Zapallo asado' },
+          { id: 'zanahoria', nombre: 'Zanahoria glaseada' },
+          { id: 'morron', nombre: 'Morrones asados' },
+          { id: 'champi', nombre: 'Champiñones salteados' },
+          { id: 'chauchas', nombre: 'Chauchas al ajillo' },
+        ],
+      },
+      {
+        id: 'salsa',
+        titulo: 'Salsa',
+        sub: 'Elegí una',
+        max: 1,
+        opciones: [
+          { id: 'limon', nombre: 'Limón y hierbas' },
+          { id: 'bbq', nombre: 'BBQ casera' },
+          { id: 'champi', nombre: 'Crema de champiñones' },
+          { id: 'mostaza', nombre: 'Mostaza y miel' },
+          { id: 'natural', nombre: 'Jugo natural' },
+        ],
+      },
+    ],
+  },
 };
 
 window.formatPrecio = (n) => {
@@ -148,6 +223,9 @@ window.formatPrecio = (n) => {
       p.complementarios = hideByDefault ? [] : ['Salsa César', 'Sobrecito de limón', 'Tostaditas'];
       p.complementarioVisible = !hideByDefault;
       p.agotado = false;
+      // Cada plato tiene precios diferenciados por opción
+      if (p.precioOp1 == null) p.precioOp1 = p.precio;
+      if (p.precioOp2 == null) p.precioOp2 = Math.max(0, p.precio - 2000);
     });
   });
 });
