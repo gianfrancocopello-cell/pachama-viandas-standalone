@@ -727,7 +727,12 @@ function ArmaScreen({ state, go, cart, setCart, variant, kind = 'ensalada' }) {
                         style={{ fontSize: 13, padding: '8px 14px', opacity: disabled ? 0.4 : 1 }}
                         onClick={() => !disabled && toggle(paso.id, op.id, paso.max)}
                       >
-                        {active ? '+ ' : ''}{op.nombre}
+                        {op.nombre}
+                        {op.precio > 0 && (
+                          <span style={{ marginLeft: 6, fontSize: 10, fontWeight: 600, opacity: active ? 0.85 : 0.65 }}>
+                            +{window.formatPrecio(op.precio)}
+                          </span>
+                        )}
                       </button>
                     );
                   })}
