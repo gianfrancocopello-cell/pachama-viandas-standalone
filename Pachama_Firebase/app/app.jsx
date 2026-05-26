@@ -701,7 +701,41 @@ function ArmaScreen({ state, go, cart, setCart, variant, kind = 'ensalada' }) {
     <>
       <Header onBack={() => go({ screen: 'home' })} title={labelTitulo} />
       <div className="pv-body" style={{ paddingBottom: 140 }}>
-        {window.ArmaEnsalada && React.createElement(window.ArmaEnsalada, { variant, selecciones: sel, onToggle: toggle, arma, kind })}
+        {/* Renderizado inline de pasos — no depende de salad.jsx */}
+        <div>
+          {arma.pasos.map((paso, pi) => {
+            const selPaso = sel[paso.id] || [];
+            return (
+              <div key={paso.id} style={{ marginTop: pi === 0 ? 0 : 22 }}>
+                <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 8 }}>
+                  <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
+                    <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--terracota)' }}>0{pi + 1}</span>
+                    <span className="pv-h3" style={{ fontSize: 18 }}>{paso.titulo}</span>
+                  </div>
+                  <span style={{ fontSize: 11, color: 'var(--tierra-soft)' }}>{paso.sub} {selPaso.length}/{paso.max}</span>
+                </div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                  {paso.opciones.map((op) => {
+                    const active = selPaso.includes(op.id);
+                    const disabled = !active && selPaso.length >= paso.max;
+                    return (
+                      <button
+                        key={op.id}
+                        className="pv-chip"
+                        aria-pressed={active}
+                        disabled={disabled}
+                        style={{ fontSize: 13, padding: '8px 14px', opacity: disabled ? 0.4 : 1 }}
+                        onClick={() => !disabled && toggle(paso.id, op.id, paso.max)}
+                      >
+                        {active ? '+ ' : ''}{op.nombre}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+        </div>
       </div>
       <div className="pv-cart-bar" onClick={completo ? add : null} style={{
         opacity: completo ? 1 : 0.6, cursor: completo ? 'pointer' : 'not-allowed',
