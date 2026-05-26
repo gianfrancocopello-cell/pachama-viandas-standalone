@@ -3,8 +3,6 @@ const { useState, useEffect, useMemo, useRef } = React;
 // Reference admin module via getters — resolved at call time after all babel scripts load.
 const getAdmin = () => window.useAdmin();
 const Img = (props) => React.createElement(window.EditableImg, props);
-// Reference salad component from window scope (defined in salad.jsx)
-const ArmaEnsalada = (props) => React.createElement(window.ArmaEnsalada, props);
 
 const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
   "layout": "list",
@@ -703,7 +701,7 @@ function ArmaScreen({ state, go, cart, setCart, variant, kind = 'ensalada' }) {
     <>
       <Header onBack={() => go({ screen: 'home' })} title={labelTitulo} />
       <div className="pv-body" style={{ paddingBottom: 140 }}>
-        <ArmaEnsalada variant={variant} selecciones={sel} onToggle={toggle} arma={arma} kind={kind} />
+        {window.ArmaEnsalada && React.createElement(window.ArmaEnsalada, { variant, selecciones: sel, onToggle: toggle, arma, kind })}
       </div>
       <div className="pv-cart-bar" onClick={completo ? add : null} style={{
         opacity: completo ? 1 : 0.6, cursor: completo ? 'pointer' : 'not-allowed',
