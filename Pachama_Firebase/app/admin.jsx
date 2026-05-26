@@ -36,7 +36,7 @@ function applyOverrides(overrides) {
   if (!D || !D.__base) {
     // Save a deep clone of original so we can reset
     D.__base = JSON.parse(JSON.stringify({
-      home: D.home, opciones: D.opciones, platos: D.platos, arma: D.arma,
+      home: D.home, opciones: D.opciones, platos: D.platos, arma: D.arma, armaComida: D.armaComida,
     }));
   }
   // Reset from base, then re-apply overrides
@@ -45,6 +45,7 @@ function applyOverrides(overrides) {
   D.opciones = JSON.parse(JSON.stringify(base.opciones));
   D.platos = JSON.parse(JSON.stringify(base.platos));
   D.arma = JSON.parse(JSON.stringify(base.arma));
+  if (base.armaComida) D.armaComida = JSON.parse(JSON.stringify(base.armaComida));
 
   for (const path in overrides) {
     setByPath(D, path, overrides[path]);
