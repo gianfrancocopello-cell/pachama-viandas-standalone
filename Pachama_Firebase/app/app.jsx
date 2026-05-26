@@ -790,7 +790,6 @@ function CarritoScreen({ go, cart, setCart }) {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               {cart.map((it, i) =>
             <div key={i} className="pv-card" style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-                  <Img id={`plato.${it.id}`} veg={!it.custom} style={{ width: 64, height: 64, borderRadius: 12, flexShrink: 0, fontSize: 9 }} />
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: 14, fontWeight: 600, lineHeight: 1.2 }}>{it.nombre}</div>
                     {it.notas && <div style={{ fontSize: 11, color: 'var(--tierra-soft)', marginTop: 4, lineHeight: 1.35,
