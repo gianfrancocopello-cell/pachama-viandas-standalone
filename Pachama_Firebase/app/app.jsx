@@ -611,10 +611,17 @@ function DetalleScreen({ state, go, cart, setCart }) {
                     flexShrink: 0,
                   }} />
                   <span style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>
-                    <span style={{ fontWeight: 600, fontSize: 15 }}>Opción {n}</span>
-                    <span style={{ fontSize: 13, fontWeight: 500, opacity: sel ? 0.9 : 0.7 }}>
-                      {window.formatPrecio(precioN)}
-                    </span>
+                    <span style={{ fontWeight: 600, fontSize: 15 }}>{n === 1 ? 'Porción Abundante' : 'Porción Liviana'}</span>
+                    {hayDesc ? (
+                      <span style={{ fontSize: 13, fontWeight: 500, opacity: sel ? 0.95 : 0.8, display: 'flex', gap: 6, alignItems: 'baseline' }}>
+                        <span style={{ textDecoration: 'line-through', opacity: 0.6 }}>{window.formatPrecio(precioN)}</span>
+                        <span style={{ fontWeight: 700 }}>{window.formatPrecio(window.aplicarDescuento ? window.aplicarDescuento(precioN) : precioN)}</span>
+                      </span>
+                    ) : (
+                      <span style={{ fontSize: 13, fontWeight: 500, opacity: sel ? 0.9 : 0.7 }}>
+                        {window.formatPrecio(precioN)}
+                      </span>
+                    )}
                   </span>
                 </button>
               );
@@ -622,7 +629,7 @@ function DetalleScreen({ state, go, cart, setCart }) {
           </div>
           {errorOpcion && (
             <div style={{ fontSize: 12, color: 'oklch(0.5 0.2 28)', marginTop: 8 }}>
-              Por favor, seleccioná Opción 1 u Opción 2 para continuar.
+              Por favor, seleccioná una porción para continuar.
             </div>
           )}
         </div>
@@ -693,7 +700,9 @@ function ArmaScreen({ state, go, cart, setCart, variant, kind = 'ensalada' }) {
   }, 0);
   // Para "comida" no se usa precio base — el precio = suma de extras seleccionados
   const baseAplicable = kind === 'comida' ? 0 : arma.base;
-  const precioTotal = baseAplicable + extras;
+  const precioBruto = baseAplicable + extras;
+  const precioTotal = window.aplicarDescuentoArma ? window.aplicarDescuentoArma(precioBruto, kind) : precioBruto;
+  const hayDescArma = window.descuentoVigente && window.descuentoVigente() && precioTotal < precioBruto;
 
   const add = () => {
     const resumen = arma.pasos.map((p) =>
@@ -762,7 +771,15 @@ function ArmaScreen({ state, go, cart, setCart, variant, kind = 'ensalada' }) {
         <div>
           <small style={{ opacity: 0.85 }}>{totalSel} ingredientes elegidos</small>
           <div style={{ fontWeight: 600, fontSize: 15, marginTop: 2 }}>
-            {completo ? `Agregar · ${window.formatPrecio(precioTotal)}` : (kind === 'comida' ? 'Elegí al menos 1 paso' : 'Elegí al menos 3 pasos')}
+            {completo ? (
+              hayDescArma ? (
+                <span style={{ display: 'inline-flex', gap: 6, alignItems: 'baseline' }}>
+                  Agregar ·
+                  <span style={{ textDecoration: 'line-through', opacity: 0.6 }}>{window.formatPrecio(precioBruto)}</span>
+                  <span>{window.formatPrecio(precioTotal)}</span>
+                </span>
+              ) : `Agregar · ${window.formatPrecio(precioTotal)}`
+            ) : (kind === 'comida' ? 'Elegí al menos 1 paso' : 'Elegí al menos 3 pasos')}
           </div>
         </div>
         <div style={{ width: 40, height: 40, borderRadius: 999,

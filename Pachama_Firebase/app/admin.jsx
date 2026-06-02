@@ -1248,6 +1248,7 @@ function ArmaEditor({ dataKey = 'arma', nombre = 'ensalada', showPrices = false 
                     display: 'flex', gap: 8, alignItems: 'center',
                     background: 'var(--crema)', borderRadius: 12, padding: 6, paddingLeft: 12,
                     border: '1px solid var(--crema-line)',
+                    opacity: op.inactivo ? 0.5 : 1,
                   }}>
                     <input
                       className="pv-input"
@@ -1256,6 +1257,7 @@ function ArmaEditor({ dataKey = 'arma', nombre = 'ensalada', showPrices = false 
                       style={{
                         height: 36, fontSize: 13, padding: '0 10px', flex: 1,
                         background: 'transparent', border: 0, borderRadius: 0,
+                        textDecoration: op.inactivo ? 'line-through' : 'none',
                       }}
                     />
                     {showPrices && (
@@ -1270,6 +1272,23 @@ function ArmaEditor({ dataKey = 'arma', nombre = 'ensalada', showPrices = false 
                         />
                       </div>
                     )}
+                    <button
+                      onClick={() => toggleOpcion(i, j)}
+                      role="switch"
+                      aria-checked={!op.inactivo}
+                      title={op.inactivo ? 'Activar' : 'Desactivar'}
+                      style={{
+                        appearance: 'none', border: 0, width: 38, height: 22, borderRadius: 999,
+                        background: op.inactivo ? 'var(--crema-line)' : 'var(--terracota)',
+                        position: 'relative', cursor: 'pointer', padding: 0, flexShrink: 0,
+                        transition: 'background .15s',
+                      }}>
+                      <span style={{
+                        position: 'absolute', top: 2, left: op.inactivo ? 2 : 18,
+                        width: 18, height: 18, borderRadius: 999, background: 'var(--hueso)',
+                        transition: 'left .15s', boxShadow: '0 1px 2px rgba(0,0,0,0.15)',
+                      }} />
+                    </button>
                     <button
                       onClick={() => removeOpcion(i, j)}
                       aria-label="Eliminar"
