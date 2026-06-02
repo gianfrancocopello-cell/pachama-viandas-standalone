@@ -756,6 +756,23 @@ function Group({ title, children }) {
   );
 }
 
+
+function DateField({ label, path }) {
+  const A = useAdmin();
+  const val = getByPath(window.MENU_DATA, path) ?? '';
+  return (
+    <div className="pv-field">
+      <label className="pv-label">{label}</label>
+      <input
+        className="pv-input"
+        type="date"
+        value={val}
+        onChange={(e) => A.setOverride(path, e.target.value)}
+      />
+    </div>
+  );
+}
+
 function GeneralEditor() {
   const FONTS = [
     { value: 'Instrument Serif', label: 'Instrument Serif (elegante)' },
@@ -792,6 +809,19 @@ function GeneralEditor() {
           Número al que se envía el pedido cuando el cliente confirma. Incluí código de país (ej: +54 9 297 …).
         </div>
         <TextField label="Número de WhatsApp" path="home.whatsapp" />
+
+      <Group title="Descuento">
+        <NumberField label="Porcentaje de descuento (%)" path="home.descuentoPorcentaje" prefix="" />
+        <DateField label="Desde (opcional)" path="home.descuentoDesde" />
+        <DateField label="Hasta (opcional)" path="home.descuentoHasta" />
+        <div style={{ height: 1, background: 'var(--crema-line)', margin: '12px 0' }} />
+        <div style={{ fontSize: 11, color: 'var(--tierra-soft)', lineHeight: 1.4, marginBottom: 6 }}>
+          El descuento se aplica a los platos. Elegí si también aplica a los configuradores:
+        </div>
+        <ToggleField label="Aplicar a Comidas y Ensaladas" path="home.descuentoPlatos" />
+        <ToggleField label="Aplicar a Arma tu ensalada" path="home.descuentoEnsalada" />
+        <ToggleField label="Aplicar a Arma tu comida" path="home.descuentoComida" />
+      </Group>
       </Group>
     </div>
   );
@@ -1120,6 +1150,11 @@ function ArmaEditor({ dataKey = 'arma', nombre = 'ensalada', showPrices = false 
 
   const setPrecioOpcion = (pasoIdx, opIdx, precio) => {
     const nuevas = pasos[pasoIdx].opciones.map((o, i) => i === opIdx ? { ...o, precio } : o);
+    setOpciones(pasoIdx, nuevas);
+  };
+
+  const toggleOpcion = (pasoIdx, opIdx) => {
+    const nuevas = pasos[pasoIdx].opciones.map((o, i) => i === opIdx ? { ...o, inactivo: !o.inactivo } : o);
     setOpciones(pasoIdx, nuevas);
   };
 

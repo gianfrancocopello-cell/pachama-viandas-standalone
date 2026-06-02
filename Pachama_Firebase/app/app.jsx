@@ -426,11 +426,20 @@ function DishCard({ plato, onTap }) {
   const op1 = plato.precioOp1 ?? plato.precio;
   const op2 = plato.precioOp2 ?? plato.precio;
   const precioMenor = Math.min(op1, op2);
-  const mostrarPrecio = agotado ? 'No disponible' : `Desde ${window.formatPrecio(precioMenor)}`;
+  const hayDesc = window.descuentoPlatosVigente ? window.descuentoPlatosVigente() : false;
+  const precioMenorFinal = window.aplicarDescuento ? window.aplicarDescuento(precioMenor) : precioMenor;
+  const mostrarPrecio = agotado ? 'No disponible' : null;
 
   const badge = agotado ?
   <div className="pv-agotado-badge"><span>Agotado</span></div> :
-  null;
+  (hayDesc ?
+  <div style={{
+    position: 'absolute', top: 8, left: 8, zIndex: 2,
+    background: 'oklch(0.55 0.2 28)', color: 'var(--hueso)',
+    fontSize: 11, fontWeight: 700, padding: '3px 9px', borderRadius: 999,
+    boxShadow: '0 2px 6px oklch(0.4 0.1 28 / 0.4)',
+  }}>−{Number(window.MENU_DATA.home.descuentoPorcentaje) || 0}%</div> :
+  null);
 
   if (layout === 'grid') {
     return (
@@ -491,7 +500,8 @@ function DetalleScreen({ state, go, cart, setCart }) {
       setErrorOpcion(true);
       return;
     }
-    const precioFinal = opcionElegida === 1 ? (p.precioOp1 ?? p.precio) : (p.precioOp2 ?? p.precio);
+    const precioBase = opcionElegida === 1 ? (p.precioOp1 ?? p.precio) : (p.precioOp2 ?? p.precio);
+    const precioFinal = window.aplicarDescuento ? window.aplicarDescuento(precioBase) : precioBase;
     setCart((c) => {
       const cartId = `${p.id}-op${opcionElegida}`;
       const existing = c.find((it) => it.id === cartId && !it.custom);
@@ -510,8 +520,11 @@ function DetalleScreen({ state, go, cart, setCart }) {
 
   const precioOp1 = p.precioOp1 ?? p.precio;
   const precioOp2 = p.precioOp2 ?? p.precio;
-  const precioMostrar = opcionElegida === 1 ? precioOp1 :
-    opcionElegida === 2 ? precioOp2 : p.precio;
+  const hayDesc = window.descuentoPlatosVigente ? window.descuentoPlatosVigente() : false;
+  const pctDesc = Number(window.MENU_DATA.home.descuentoPorcentaje) || 0;
+  const precioBaseMostrar = opcionElegida === 1 ? precioOp1 :
+    opcionElegida === 2 ? precioOp2 : null;
+  const precioMostrar = precioBaseMostrar == null ? null : (window.aplicarDescuento ? window.aplicarDescuento(precioBaseMostrar) : precioBaseMostrar);
 
   return (
     <>

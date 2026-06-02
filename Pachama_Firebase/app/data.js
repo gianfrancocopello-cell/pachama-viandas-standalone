@@ -25,6 +25,13 @@ window.MENU_DATA = {
     comboBajada: 'El menú del día',
     comboDescripcion: 'Elegí entre nuestras ensaladas y comidas preparadas hoy.',
     comboPrecioDesde: 6400,
+    descuentoActivo: false,
+    descuentoPorcentaje: 10,
+    descuentoDesde: '',
+    descuentoHasta: '',
+    descuentoEnsalada: true,
+    descuentoComida: true,
+    descuentoPlatos: true,
   },
   opciones: {
     1: {
@@ -211,6 +218,47 @@ window.MENU_DATA = {
 
 window.formatPrecio = (n) => {
   return '$' + n.toLocaleString('es-AR');
+};
+
+// ¿Está vigente el descuento hoy? Considera fechas opcionales (YYYY-MM-DD).
+window.descuentoVigente = () => {
+  const h = window.MENU_DATA.home;
+  const pct = Number(h.descuentoPorcentaje) || 0;
+  if (pct <= 0) return false;
+  const hoy = new Date();
+  hoy.setHours(0, 0, 0, 0);
+  if (h.descuentoDesde) {
+    const d = new Date(h.descuentoDesde + 'T00:00:00');
+    if (!isNaN(d) && hoy < d) return false;
+  }
+  if (h.descuentoHasta) {
+    const d = new Date(h.descuentoHasta + 'T00:00:00');
+    if (!isNaN(d) && hoy > d) return false;
+  }
+  return true;
+};
+
+// Aplica el descuento a un precio si está vigente.
+window.aplicarDescuento = (precio) => {
+  if (!window.descuentoVigente()) return precio;
+  if (!window.MENU_DATA.home.descuentoPlatos) return precio;
+  const pct = Number(window.MENU_DATA.home.descuentoPorcentaje) || 0;
+  return Math.round(precio * (1 - pct / 100));
+};
+
+// ¿Aplica descuento a los platos (Comidas y Ensaladas)?
+window.descuentoPlatosVigente = () => {
+  return window.descuentoVigente() && !!window.MENU_DATA.home.descuentoPlatos;
+};
+
+// Aplica el descuento al configurador "Arma tu ..." solo si está habilitado para esa sección.
+window.aplicarDescuentoArma = (precio, kind) => {
+  if (!window.descuentoVigente()) return precio;
+  const h = window.MENU_DATA.home;
+  if (kind === 'comida' && !h.descuentoComida) return precio;
+  if (kind !== 'comida' && !h.descuentoEnsalada) return precio;
+  const pct = Number(h.descuentoPorcentaje) || 0;
+  return Math.round(precio * (1 - pct / 100));
 };
 
 // Defaults de "Complementario" por plato.
