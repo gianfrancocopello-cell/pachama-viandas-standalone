@@ -737,7 +737,7 @@ function ArmaScreen({ state, go, cart, setCart, variant, kind = 'ensalada' }) {
                   <span style={{ fontSize: 11, color: 'var(--tierra-soft)' }}>{paso.sub} {selPaso.length}/{paso.max}</span>
                 </div>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                  {paso.opciones.map((op) => {
+                  {paso.opciones.filter((op) => !op.inactivo).map((op) => {
                     const active = selPaso.includes(op.id);
                     const disabled = !active && selPaso.length >= paso.max;
                     return (
