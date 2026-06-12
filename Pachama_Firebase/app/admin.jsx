@@ -374,6 +374,7 @@ function AdminScreen({ go }) {
             { id: 'platos', label: 'Platos' },
             { id: 'ensalada', label: 'Ensalada' },
             { id: 'comida', label: 'Comida' },
+            { id: 'bebidas', label: 'Bebidas' },
           ].map((t) => (
             <div
               key={t.id}
@@ -390,6 +391,7 @@ function AdminScreen({ go }) {
         {tab === 'platos' && <PlatosEditor />}
         {tab === 'ensalada' && <ArmaEditor dataKey="arma" nombre="ensalada" showPrices={false} />}
         {tab === 'comida' && <ArmaEditor dataKey="armaComida" nombre="comida" showPrices={true} />}
+        {tab === 'bebidas' && <BebidasGroup />}
 
         <div style={{ marginTop: 30, padding: 16, background: 'oklch(0.96 0.02 30)', borderRadius: 14, border: '1px dashed oklch(0.7 0.1 30)' }}>
           <div style={{ fontSize: 12, fontWeight: 600, color: 'oklch(0.45 0.12 30)' }}>Zona de peligro</div>
