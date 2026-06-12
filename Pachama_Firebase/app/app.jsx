@@ -486,14 +486,128 @@ function DishCard({ plato, onTap }) {
 
 }
 
+// Devuelve un nuevo carrito con las bebidas seleccionadas agregadas
+// Devuelve un nuevo carrito con las bebidas seleccionadas agregadas
+// seleccion: { [bebidaId]: [variante1, variante2, ...] | [true] | undefined }
+function agregarBebidas(prev, seleccion) {
+  let c = [...prev];
+  (window.MENU_DATA.bebidas || []).forEach((b) => {
+    const elegidos = seleccion[b.id];
+    if (!Array.isArray(elegidos) || elegidos.length === 0) return;
+    elegidos.forEach((elegido) => {
+      const variante = typeof elegido === 'string' ? elegido : null;
+      const id = 'bebida-' + b.id + (variante ? '-' + variante : '');
+      const nombre = variante ? `${b.nombre} · ${variante}` : b.nombre;
+      const ex = c.find((it) => it.id === id);
+      if (ex) c = c.map((it) => it.id === id ? { ...it, cantidad: it.cantidad + 1 } : it);
+      else c = [...c, { id, nombre, precio: b.precio, cantidad: 1 }];
+    });
+  });
+  return c;
+}
+
+// Sección "¿Querés agregar una bebida?"
+function BebidasAddon({ seleccion, onSelect }) {
+  const bebidas = (window.MENU_DATA.bebidas || []).filter((b) => b.activa);
+  if (bebidas.length === 0) return null;
+  return (
+    <div style={{ marginTop: 22 }}>
+      <div className="pv-eyebrow" style={{ marginBottom: 8 }}>¿Querés agregar una bebida?</div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {bebidas.map((b) => {
+          const variantes = (b.variantes || []).filter(Boolean);
+          const tieneVar = variantes.length > 0;
+          const elegidos = Array.isArray(seleccion[b.id]) ? seleccion[b.id] : [];
+          const sel = elegidos.length > 0;
+          const toggleVariante = (v) => {
+            const next = elegidos.includes(v) ? elegidos.filter((x) => x !== v) : [...elegidos, v];
+            onSelect(b.id, next.length ? next : undefined);
+          };
+          return (
+            <div key={b.id} style={{
+              border: '1.5px solid',
+              borderColor: sel ? 'var(--verde)' : 'var(--crema-line)',
+              borderRadius: 14, overflow: 'hidden',
+              background: sel ? 'var(--verde-soft)' : 'var(--hueso)',
+            }}>
+              <button
+                onClick={() => {
+                  if (sel) onSelect(b.id, undefined); // deseleccionar todo
+                  else onSelect(b.id, tieneVar ? [variantes[0]] : [true]); // marcar
+                }}
+                style={{
+                  appearance: 'none', cursor: 'pointer', fontFamily: 'inherit',
+                  padding: '12px 14px', width: '100%', background: 'transparent',
+                  border: 0, color: 'var(--tierra)',
+                  display: 'flex', alignItems: 'center', gap: 12, textAlign: 'left',
+                }}
+              >
+                <span style={{
+                  width: 20, height: 20, borderRadius: 6,
+                  border: '2px solid', borderColor: sel ? 'var(--verde)' : 'var(--crema-line)',
+                  background: sel ? 'var(--verde)' : 'transparent',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                }}>
+                  {sel && (
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
+                      <path d="M5 12.5l4.5 4.5L19 7.5" stroke="var(--hueso)" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  )}
+                </span>
+                <span style={{ fontWeight: 600, fontSize: 15, flex: 1 }}>
+                  {b.nombre}
+                  {sel && elegidos.some((x) => typeof x === 'string') && (
+                    <span style={{ fontWeight: 500, fontSize: 13, color: 'var(--tierra-soft)' }}> · {elegidos.filter((x) => typeof x === 'string').join(', ')}</span>
+                  )}
+                </span>
+                <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--terracota)' }}>+{window.formatPrecio(b.precio)} c/u</span>
+              </button>
+
+              {/* Opciones de la bebida — se puede elegir más de una */}
+              {sel && tieneVar && (
+                <div style={{ padding: '0 14px 12px' }}>
+                  <div style={{ fontSize: 11, color: 'oklch(0.36 0.06 130)', marginBottom: 8 }}>Tocá las que quieras agregar:</div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                    {variantes.map((v) => {
+                      const activa = elegidos.includes(v);
+                      return (
+                        <button
+                          key={v}
+                          onClick={() => toggleVariante(v)}
+                          style={{
+                            appearance: 'none', cursor: 'pointer', fontFamily: 'inherit',
+                            padding: '7px 12px', borderRadius: 999, fontSize: 13, fontWeight: 500,
+                            border: '1px solid',
+                            borderColor: activa ? 'var(--verde)' : 'var(--crema-line)',
+                            background: activa ? 'var(--verde)' : 'var(--hueso)',
+                            color: activa ? 'var(--hueso)' : 'var(--tierra)',
+                          }}
+                        >{activa ? '✓ ' : ''}{v}</button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 // ── DETALLE ──
 function DetalleScreen({ state, go, cart, setCart }) {
   const p = state.plato;
   const [qty, setQty] = useState(1);
   const [opcionElegida, setOpcionElegida] = useState(null); // 1 o 2
   const [errorOpcion, setErrorOpcion] = useState(false);
+  const [bebidaSel, setBebidaSel] = useState({});
   const compls = p.complementarios || [];
   const esEnsalada = !!p.complementarioVisible && compls.length > 0;
+  const ofrecerBebida = state.categoria === 'comidas' || state.categoria === 'ensaladas';
+
+  const onSelectBebida = (id, val) => setBebidaSel((s) => ({ ...s, [id]: val }));
 
   const add = () => {
     if (!opcionElegida) {
@@ -505,26 +619,29 @@ function DetalleScreen({ state, go, cart, setCart }) {
     setCart((c) => {
       const cartId = `${p.id}-op${opcionElegida}`;
       const existing = c.find((it) => it.id === cartId && !it.custom);
+      let next;
       if (existing) {
-        return c.map((it) => it.id === cartId && !it.custom ? { ...it, cantidad: it.cantidad + qty } : it);
+        next = c.map((it) => it.id === cartId && !it.custom ? { ...it, cantidad: it.cantidad + qty } : it);
+      } else {
+        next = [...c, {
+          id: cartId,
+          nombre: `${p.nombre} (${opcionElegida === 1 ? 'Porción Abundante' : 'Porción Liviana'})`,
+          precio: precioFinal,
+          cantidad: qty,
+        }];
       }
-      return [...c, {
-        id: cartId,
-        nombre: `${p.nombre} (Opción ${opcionElegida})`,
-        precio: precioFinal,
-        cantidad: qty,
-      }];
+      return ofrecerBebida ? agregarBebidas(next, bebidaSel) : next;
     });
     go({ screen: 'menu', opcion: state.opcion, categoria: state.categoria });
   };
 
-  const precioOp1 = p.precioOp1 ?? p.precio;
-  const precioOp2 = p.precioOp2 ?? p.precio;
   const hayDesc = window.descuentoPlatosVigente ? window.descuentoPlatosVigente() : false;
   const pctDesc = Number(window.MENU_DATA.home.descuentoPorcentaje) || 0;
+  const precioOp1 = p.precioOp1 ?? p.precio;
+  const precioOp2 = p.precioOp2 ?? p.precio;
   const precioBaseMostrar = opcionElegida === 1 ? precioOp1 :
     opcionElegida === 2 ? precioOp2 : null;
-  const precioMostrar = precioBaseMostrar == null ? null : (window.aplicarDescuento ? window.aplicarDescuento(precioBaseMostrar) : precioBaseMostrar);
+  const precioMostrar = precioBaseMostrar == null ? null : window.aplicarDescuento(precioBaseMostrar);
 
   return (
     <>
@@ -546,6 +663,15 @@ function DetalleScreen({ state, go, cart, setCart }) {
         </div>
         <div style={{ maxWidth: 520, margin: '0 auto' }}>
         <div className="pv-h2">{p.nombre}</div>
+        {hayDesc && (
+          <div style={{
+            display: 'inline-flex', alignItems: 'center', gap: 6, marginTop: 10,
+            background: 'oklch(0.55 0.2 28)', color: 'var(--hueso)',
+            fontSize: 12, fontWeight: 700, padding: '5px 12px', borderRadius: 999,
+          }}>
+            −{pctDesc}% OFF
+          </div>
+        )}
         <div style={{ display: 'flex', gap: 6, marginTop: 10, flexWrap: 'wrap' }}>
           {p.tags.map((t) => <span key={t} className="pv-tag pv-tag-veg">{t}</span>)}
         </div>
@@ -629,10 +755,12 @@ function DetalleScreen({ state, go, cart, setCart }) {
           </div>
           {errorOpcion && (
             <div style={{ fontSize: 12, color: 'oklch(0.5 0.2 28)', marginTop: 8 }}>
-              Por favor, seleccioná una porción para continuar.
+              Por favor, seleccioná Opción 1 u Opción 2 para continuar.
             </div>
           )}
         </div>
+
+        {ofrecerBebida && <BebidasAddon seleccion={bebidaSel} onSelect={onSelectBebida} />}
 
         <div style={{ marginTop: 22, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div className="pv-stepper">
@@ -640,7 +768,7 @@ function DetalleScreen({ state, go, cart, setCart }) {
             <span className="pv-stepper-val">{qty}</span>
             <button onClick={() => setQty(qty + 1)}>+</button>
           </div>
-          <div style={{ fontSize: 22, fontWeight: 600 }}>{window.formatPrecio(precioMostrar * qty)}</div>
+          <div style={{ fontSize: 22, fontWeight: 600 }}>{precioMostrar == null ? '' : window.formatPrecio(precioMostrar * qty)}</div>
         </div>
         </div>
       </div>
@@ -649,7 +777,6 @@ function DetalleScreen({ state, go, cart, setCart }) {
           <small>Agregar al pedido</small>
           <div style={{ fontWeight: 600, fontSize: 15, marginTop: 2 }}>Sumar {qty} {qty === 1 ? 'plato' : 'platos'}</div>
         </div>
-        <div style={{ fontSize: 15, fontWeight: 700 }}>{window.formatPrecio(precioMostrar * qty)}</div>
       </div>
     </>);
 
@@ -668,6 +795,9 @@ function ArmaScreen({ state, go, cart, setCart, variant, kind = 'ensalada' }) {
     arma.pasos.forEach((p) => { obj[p.id] = []; });
     return obj;
   });
+  const [bebidaSel, setBebidaSel] = useState({});
+  const ofrecerBebida = kind === 'comida';
+  const onSelectBebida = (id, val) => setBebidaSel((s) => ({ ...s, [id]: val }));
 
   const toggle = (pasoId, opId, max) => {
     setSel((s) => {
@@ -702,20 +832,23 @@ function ArmaScreen({ state, go, cart, setCart, variant, kind = 'ensalada' }) {
   const baseAplicable = kind === 'comida' ? 0 : arma.base;
   const precioBruto = baseAplicable + extras;
   const precioTotal = window.aplicarDescuentoArma ? window.aplicarDescuentoArma(precioBruto, kind) : precioBruto;
-  const hayDescArma = window.descuentoVigente && window.descuentoVigente() && precioTotal < precioBruto;
+  const hayDescArma = window.descuentoVigente ? window.descuentoVigente() : false && precioTotal < precioBruto;
 
   const add = () => {
     const resumen = arma.pasos.map((p) =>
     (sel[p.id] || []).map((id) => p.opciones.find((o) => o.id === id)?.nombre).join(', ')
     ).filter(Boolean).join(' · ');
-    setCart((c) => [...c, {
-      id: dataKey + '-' + Date.now(),
-      nombre: labelCart,
-      precio: precioTotal,
-      cantidad: 1,
-      custom: true,
-      notas: resumen
-    }]);
+    setCart((c) => {
+      const conPlato = [...c, {
+        id: dataKey + '-' + Date.now(),
+        nombre: labelCart,
+        precio: precioTotal,
+        cantidad: 1,
+        custom: true,
+        notas: resumen
+      }];
+      return ofrecerBebida ? agregarBebidas(conPlato, bebidaSel) : conPlato;
+    });
     go({ screen: 'home' });
   };
 
@@ -763,6 +896,7 @@ function ArmaScreen({ state, go, cart, setCart, variant, kind = 'ensalada' }) {
             );
           })}
         </div>
+        {ofrecerBebida && <BebidasAddon seleccion={bebidaSel} onSelect={onSelectBebida} />}
       </div>
       <div className="pv-cart-bar" onClick={completo ? add : null} style={{
         opacity: completo ? 1 : 0.6, cursor: completo ? 'pointer' : 'not-allowed',
@@ -928,7 +1062,7 @@ function CheckoutScreen({ go, cart, setCart }) {
         <div className="pv-h3" style={{ marginBottom: 14 }}>Forma de pago</div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {[
-          { id: 'transferencia', label: 'Transferencia', sub: 'CBU / alias bancario' },
+          { id: 'transferencia', label: 'Transferencia', sub: '' },
           { id: 'efectivo', label: 'Efectivo al entregar', sub: '' }].
           map((o) => {
             const sel = form.pago === o.id;
@@ -1001,10 +1135,19 @@ function CheckoutScreen({ go, cart, setCart }) {
 
 // ── CONFIRMACIÓN ──
 function ConfirmScreen({ state, go, setCart }) {
-  useEffect(() => {
-    return () => {};
-  }, []);
+  const [copiado, setCopiado] = useState('');
   const codigo = useMemo(() => 'PV-' + Math.floor(Math.random() * 9000 + 1000), []);
+  const D = window.MENU_DATA;
+  const esTransferencia = state.form?.pago === 'transferencia';
+
+  const copiar = (texto, key) => {
+    try {
+      navigator.clipboard.writeText(texto);
+      setCopiado(key);
+      setTimeout(() => setCopiado(''), 1800);
+    } catch (e) {}
+  };
+
   return (
     <>
       <Header title="¡Listo!" />
@@ -1018,7 +1161,64 @@ function ConfirmScreen({ state, go, setCart }) {
           Te llega hoy entre las <b>12:00 y 13:00</b>. Te avisamos por WhatsApp cuando salga del local.
         </div>
 
-        <div className="pv-card" style={{ marginTop: 28, textAlign: 'left' }}>
+        {esTransferencia && (
+          <div className="pv-card" style={{ marginTop: 24, textAlign: 'left', background: 'var(--terracota-soft)', borderColor: 'transparent' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+              <span style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'oklch(0.4 0.12 40)' }}>Transferí para confirmar</span>
+            </div>
+            <div style={{ fontSize: 13, color: 'oklch(0.36 0.08 40)', marginBottom: 14, lineHeight: 1.4 }}>
+              Hacé la transferencia a este alias desde tu billetera o banco. Después mandanos el comprobante por WhatsApp.
+            </div>
+
+            {/* Alias */}
+            <div style={{
+              background: 'var(--hueso)', borderRadius: 12, padding: '12px 14px',
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 8,
+            }}>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: 10, color: 'var(--tierra-soft)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Alias {D.home.transferBanco ? `· ${D.home.transferBanco}` : ''}</div>
+                <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--tierra)', overflow: 'hidden', textOverflow: 'ellipsis' }}>{D.home.transferAlias}</div>
+              </div>
+              <button className="pv-btn pv-btn-sm" style={{ flexShrink: 0 }} onClick={() => copiar(D.home.transferAlias, 'alias')}>
+                {copiado === 'alias' ? '¡Copiado!' : 'Copiar'}
+              </button>
+            </div>
+
+            {/* Monto */}
+            <div style={{
+              background: 'var(--hueso)', borderRadius: 12, padding: '12px 14px',
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 8,
+            }}>
+              <div>
+                <div style={{ fontSize: 10, color: 'var(--tierra-soft)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Monto a transferir</div>
+                <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--tierra)' }}>{window.formatPrecio(state.total || 0)}</div>
+              </div>
+              <button className="pv-btn pv-btn-sm" style={{ flexShrink: 0 }} onClick={() => copiar(String(state.total || 0), 'monto')}>
+                {copiado === 'monto' ? '¡Copiado!' : 'Copiar'}
+              </button>
+            </div>
+
+            {D.home.transferTitular && (
+              <div style={{ fontSize: 12, color: 'oklch(0.36 0.08 40)', marginTop: 6 }}>
+                Titular: <b>{D.home.transferTitular}</b>
+              </div>
+            )}
+
+            <button
+              className="pv-btn pv-btn-full"
+              style={{ marginTop: 14 }}
+              onClick={() => {
+                const numero = (D.home.whatsapp || '').replace(/\D/g, '');
+                const msg = `Hola! Acabo de hacer una transferencia por ${window.formatPrecio(state.total || 0)} por mi pedido ${codigo}. Adjunto el comprobante.`;
+                if (numero) window.open(`https://wa.me/${numero}?text=${encodeURIComponent(msg)}`, '_blank');
+              }}
+            >
+              Enviar comprobante por WhatsApp
+            </button>
+          </div>
+        )}
+
+        <div className="pv-card" style={{ marginTop: esTransferencia ? 14 : 28, textAlign: 'left' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
             {Icon.pin('var(--terracota)')}
             <span style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--terracota)' }}>Entrega</span>
@@ -1031,7 +1231,7 @@ function ConfirmScreen({ state, go, setCart }) {
           <Row label="Total cobrado" value={window.formatPrecio(state.total || 0)} bold />
         </div>
 
-        <button className="pv-btn pv-btn-full" style={{ marginTop: 28 }} onClick={() => {setCart([]);go({ screen: 'home' });}}>
+        <button className="pv-btn pv-btn-full pv-btn-ghost" style={{ marginTop: 16 }} onClick={() => {setCart([]);go({ screen: 'home' });}}>
           Volver al menú
         </button>
       </div>

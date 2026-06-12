@@ -15,6 +15,10 @@ window.MENU_DATA = {
     delivery: 'Zona Industrial – Barrio Sur, Comodoro Rivadavia.',
     hours: 'Entrega 12:00 – 13:30',
     whatsapp: '+54 9 2974 27-9849',
+    transferAlias: 'pachamama.viandas',
+    transferTitular: 'Pachamama Viandas',
+    transferBanco: 'Ualá',
+    mpLink: '',
     logoOffset: { x: 0, y: 0 },
     cerrado: false,
     cerradoMensaje: 'Muchas gracias por su compra',
@@ -69,6 +73,13 @@ window.MENU_DATA = {
     ensaladas: { nombre: 'Ensaladas', short: 'Ensaladas' },
     comidas: { nombre: 'Comidas', short: 'Comidas' },
   },
+  // Bebidas opcionales que se ofrecen al agregar una comida o "Arma tu comida"
+  bebidas: [
+    { id: 'gaseosa', nombre: 'Gaseosa', precio: 1800, activa: true,
+      variantes: ['Coca-Cola', 'Coca-Cola Zero', 'Sprite', 'Fanta', 'Paso de los Toros'] },
+    { id: 'agua', nombre: 'Agua', precio: 1200, activa: true,
+      variantes: ['Sin gas', 'Con gas', 'Saborizada'] },
+  ],
   platos: {
     // OPCIÓN 1 — abundante
     ensaladas: {
