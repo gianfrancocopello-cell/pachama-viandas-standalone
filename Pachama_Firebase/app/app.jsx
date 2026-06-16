@@ -506,92 +506,209 @@ function agregarBebidas(prev, seleccion) {
   return c;
 }
 
-// Sección "¿Querés agregar una bebida?"
+// Fila de opción con stepper de cantidad (dentro de la pantalla de bebidas)
+function BebidaOptRow({ label, qty, onMinus, onPlus, agotada }) {
+  const activa = qty > 0;
+  if (agotada) {
+    return (
+      <div className="pv-sheet-opt pv-sheet-opt-agotada" aria-disabled="true" style={{ cursor: 'not-allowed' }}>
+        <span style={{ fontWeight: 600, fontSize: 15, flex: 1, minWidth: 0, textDecoration: 'line-through', color: 'var(--tierra-soft)' }}>{label}</span>
+        <span className="pv-agotado-tag">Agotado</span>
+      </div>
+    );
+  }
+  return (
+    <div className="pv-sheet-opt" aria-selected={activa} style={{ cursor: 'default' }}>
+      <span style={{ fontWeight: 600, fontSize: 15, flex: 1, minWidth: 0 }}>{label}</span>
+      <div className="pv-stepper" style={{ padding: 3, gap: 4, flexShrink: 0 }}>
+        <button style={{ width: 30, height: 30 }} onClick={onMinus} disabled={qty === 0} aria-label="Quitar">−</button>
+        <span className="pv-stepper-val" style={{ fontSize: 14, minWidth: 20, textAlign: 'center' }}>{qty}</span>
+        <button style={{ width: 30, height: 30 }} onClick={onPlus} aria-label="Sumar">+</button>
+      </div>
+    </div>
+  );
+}
+
+// ¿Está agotada esta opción? (b.agotado = toda la bebida; b.agotados = opciones puntuales)
+function bebidaOpcionAgotada(b, key) {
+  if (b.agotado) return true;
+  if (key === true) return false;
+  return (b.agotados || []).includes(key);
+}
+
+// Pantalla extra (bottom sheet) — todas las bebidas y sus opciones en una sola pantalla.
+// Modelo: local[bebidaId] = ['Coca-Cola', 'Coca-Cola', 'Sprite', ...] (repetir = cantidad)
+function BebidaSheet({ bebidas, seleccion, onClose, onConfirm }) {
+  const [local, setLocal] = useState(() => {
+    const o = {};
+    bebidas.forEach((b) => {
+      const arr = Array.isArray(seleccion[b.id]) ? seleccion[b.id] : [];
+      o[b.id] = arr.filter((x) => !bebidaOpcionAgotada(b, x)); // descartar opciones que quedaron agotadas
+    });
+    return o;
+  });
+
+  const qtyOf = (bid, key) => (local[bid] || []).filter((x) => x === key).length;
+  const setQty = (bid, key, delta) => {
+    setLocal((s) => {
+      const cur = s[bid] || [];
+      let next;
+      if (delta > 0) next = [...cur, key];
+      else {
+        const i = cur.indexOf(key);
+        next = i === -1 ? cur : [...cur.slice(0, i), ...cur.slice(i + 1)];
+      }
+      return { ...s, [bid]: next };
+    });
+  };
+
+  const totalUnidades = bebidas.reduce((a, b) => a + (local[b.id] || []).length, 0);
+  const totalPrecio = bebidas.reduce((a, b) => a + (local[b.id] || []).length * b.precio, 0);
+
+  return (
+    <div className="pv-sheet-overlay" onClick={onClose}>
+      <div className="pv-sheet" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
+        <div className="pv-sheet-grip" />
+        <div className="pv-sheet-head">
+          <div style={{ minWidth: 0 }}>
+            <div className="pv-eyebrow" style={{ color: 'oklch(0.42 0.08 130)' }}>Agregá lo que quieras</div>
+            <div className="pv-h3" style={{ marginTop: 2 }}>Bebidas</div>
+          </div>
+          <button className="pv-sheet-close" onClick={onClose} aria-label="Cerrar">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+              <path d="M6 6l12 12M18 6L6 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+            </svg>
+          </button>
+        </div>
+
+        <div className="pv-sheet-body">
+          <div style={{ fontSize: 12, color: 'var(--tierra-soft)', marginBottom: 14 }}>
+            Elegí las que quieras y sumá la cantidad de cada una.
+          </div>
+          {bebidas.map((b, i) => {
+            const variantes = (b.variantes || []).filter(Boolean);
+            const tieneVar = variantes.length > 0;
+            return (
+              <div key={b.id} style={{ marginBottom: i === bebidas.length - 1 ? 0 : 22 }}>
+                <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 9 }}>
+                  <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.14em', textTransform: 'uppercase', color: b.agotado ? 'var(--tierra-soft)' : 'var(--tierra)', display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ textDecoration: b.agotado ? 'line-through' : 'none' }}>{b.nombre}</span>
+                    {b.agotado && <span className="pv-agotado-tag">Agotado</span>}
+                  </div>
+                  {!b.agotado && <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--terracota)' }}>+{window.formatPrecio(b.precio)} c/u</div>}
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {tieneVar ? variantes.map((v) => (
+                    <BebidaOptRow
+                      key={v}
+                      label={v}
+                      qty={qtyOf(b.id, v)}
+                      agotada={bebidaOpcionAgotada(b, v)}
+                      onMinus={() => setQty(b.id, v, -1)}
+                      onPlus={() => setQty(b.id, v, 1)} />
+                  )) : (
+                    <BebidaOptRow
+                      label={b.nombre}
+                      qty={qtyOf(b.id, true)}
+                      agotada={!!b.agotado}
+                      onMinus={() => setQty(b.id, true, -1)}
+                      onPlus={() => setQty(b.id, true, 1)} />
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        <div className="pv-sheet-foot">
+          <button
+            className="pv-btn pv-btn-full"
+            onClick={() => onConfirm(local)}
+            style={totalUnidades === 0 ? { background: 'var(--tierra)' } : {}}
+          >
+            {totalUnidades === 0
+              ? 'Listo, sin bebidas'
+              : `Agregar ${totalUnidades} ${totalUnidades === 1 ? 'bebida' : 'bebidas'} · ${window.formatPrecio(totalPrecio)}`}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Sección "¿Querés agregar una bebida?" — abre una sola pantalla con todas las opciones
 function BebidasAddon({ seleccion, onSelect }) {
   const bebidas = (window.MENU_DATA.bebidas || []).filter((b) => b.activa);
+  const [open, setOpen] = useState(false);
   if (bebidas.length === 0) return null;
+
+  // Resumen de lo elegido (agrupado por opción, con cantidad)
+  const resumen = [];
+  let totalUnidades = 0;
+  let totalPrecio = 0;
+  bebidas.forEach((b) => {
+    const els = Array.isArray(seleccion[b.id]) ? seleccion[b.id] : [];
+    totalUnidades += els.length;
+    totalPrecio += els.length * b.precio;
+    const counts = {};
+    els.forEach((x) => {
+      const k = typeof x === 'string' ? x : b.nombre;
+      counts[k] = (counts[k] || 0) + 1;
+    });
+    Object.entries(counts).forEach(([k, n]) => resumen.push(`${n}× ${k}`));
+  });
+  const hay = totalUnidades > 0;
+
   return (
     <div style={{ marginTop: 22 }}>
       <div className="pv-eyebrow" style={{ marginBottom: 8 }}>¿Querés agregar una bebida?</div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-        {bebidas.map((b) => {
-          const variantes = (b.variantes || []).filter(Boolean);
-          const tieneVar = variantes.length > 0;
-          const elegidos = Array.isArray(seleccion[b.id]) ? seleccion[b.id] : [];
-          const sel = elegidos.length > 0;
-          const toggleVariante = (v) => {
-            const next = elegidos.includes(v) ? elegidos.filter((x) => x !== v) : [...elegidos, v];
-            onSelect(b.id, next.length ? next : undefined);
-          };
-          return (
-            <div key={b.id} style={{
-              border: '1.5px solid',
-              borderColor: sel ? 'var(--verde)' : 'var(--crema-line)',
-              borderRadius: 14, overflow: 'hidden',
-              background: sel ? 'var(--verde-soft)' : 'var(--hueso)',
-            }}>
-              <button
-                onClick={() => {
-                  if (sel) onSelect(b.id, undefined); // deseleccionar todo
-                  else onSelect(b.id, tieneVar ? [variantes[0]] : [true]); // marcar
-                }}
-                style={{
-                  appearance: 'none', cursor: 'pointer', fontFamily: 'inherit',
-                  padding: '12px 14px', width: '100%', background: 'transparent',
-                  border: 0, color: 'var(--tierra)',
-                  display: 'flex', alignItems: 'center', gap: 12, textAlign: 'left',
-                }}
-              >
-                <span style={{
-                  width: 20, height: 20, borderRadius: 6,
-                  border: '2px solid', borderColor: sel ? 'var(--verde)' : 'var(--crema-line)',
-                  background: sel ? 'var(--verde)' : 'transparent',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-                }}>
-                  {sel && (
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
-                      <path d="M5 12.5l4.5 4.5L19 7.5" stroke="var(--hueso)" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
-                    </svg>
-                  )}
-                </span>
-                <span style={{ fontWeight: 600, fontSize: 15, flex: 1 }}>
-                  {b.nombre}
-                  {sel && elegidos.some((x) => typeof x === 'string') && (
-                    <span style={{ fontWeight: 500, fontSize: 13, color: 'var(--tierra-soft)' }}> · {elegidos.filter((x) => typeof x === 'string').join(', ')}</span>
-                  )}
-                </span>
-                <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--terracota)' }}>+{window.formatPrecio(b.precio)} c/u</span>
-              </button>
+      <button
+        onClick={() => setOpen(true)}
+        style={{
+          appearance: 'none', cursor: 'pointer', fontFamily: 'inherit',
+          width: '100%', padding: '14px 16px', textAlign: 'left',
+          border: '1.5px solid', borderColor: hay ? 'var(--verde)' : 'var(--crema-line)',
+          borderRadius: 14, background: hay ? 'var(--verde-soft)' : 'var(--hueso)',
+          color: 'var(--tierra)', display: 'flex', alignItems: 'center', gap: 12,
+        }}
+      >
+        <span style={{
+          width: 38, height: 38, borderRadius: 999, flexShrink: 0,
+          background: hay ? 'var(--verde)' : 'var(--crema-deep)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+            <path d="M7 8h10l-1 11a2 2 0 01-2 1.8H10a2 2 0 01-2-1.8L7 8z" stroke={hay ? 'var(--hueso)' : 'var(--tierra-soft)'} strokeWidth="1.6" />
+            <path d="M9 8V6.5A1.5 1.5 0 0110.5 5h3A1.5 1.5 0 0115 6.5V8" stroke={hay ? 'var(--hueso)' : 'var(--tierra-soft)'} strokeWidth="1.6" />
+            <path d="M8.5 12.5h7" stroke={hay ? 'var(--hueso)' : 'var(--tierra-soft)'} strokeWidth="1.6" strokeLinecap="round" />
+          </svg>
+        </span>
+        <span style={{ flex: 1, minWidth: 0 }}>
+          <span style={{ display: 'block', fontWeight: 600, fontSize: 15 }}>
+            {hay ? `${totalUnidades} ${totalUnidades === 1 ? 'bebida' : 'bebidas'} · ${window.formatPrecio(totalPrecio)}` : 'Agregá tus bebidas'}
+          </span>
+          <span style={{ display: 'block', fontWeight: 500, fontSize: 12.5, color: 'var(--tierra-soft)', marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            {hay ? resumen.join(' · ') : 'Gaseosas, agua y más'}
+          </span>
+        </span>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" style={{ color: 'var(--tierra-soft)', flexShrink: 0 }}>
+          <path d="M9 6l6 6-6 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </button>
 
-              {/* Opciones de la bebida — se puede elegir más de una */}
-              {sel && tieneVar && (
-                <div style={{ padding: '0 14px 12px' }}>
-                  <div style={{ fontSize: 11, color: 'oklch(0.36 0.06 130)', marginBottom: 8 }}>Tocá las que quieras agregar:</div>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                    {variantes.map((v) => {
-                      const activa = elegidos.includes(v);
-                      return (
-                        <button
-                          key={v}
-                          onClick={() => toggleVariante(v)}
-                          style={{
-                            appearance: 'none', cursor: 'pointer', fontFamily: 'inherit',
-                            padding: '7px 12px', borderRadius: 999, fontSize: 13, fontWeight: 500,
-                            border: '1px solid',
-                            borderColor: activa ? 'var(--verde)' : 'var(--crema-line)',
-                            background: activa ? 'var(--verde)' : 'var(--hueso)',
-                            color: activa ? 'var(--hueso)' : 'var(--tierra)',
-                          }}
-                        >{activa ? '✓ ' : ''}{v}</button>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
+      {open && (
+        <BebidaSheet
+          bebidas={bebidas}
+          seleccion={seleccion}
+          onClose={() => setOpen(false)}
+          onConfirm={(local) => {
+            bebidas.forEach((b) => {
+              const arr = local[b.id] || [];
+              onSelect(b.id, arr.length ? arr : undefined);
+            });
+            setOpen(false);
+          }} />
+      )}
     </div>
   );
 }
@@ -796,7 +913,7 @@ function ArmaScreen({ state, go, cart, setCart, variant, kind = 'ensalada' }) {
     return obj;
   });
   const [bebidaSel, setBebidaSel] = useState({});
-  const ofrecerBebida = kind === 'comida';
+  const ofrecerBebida = kind === 'comida' || kind === 'ensalada';
   const onSelectBebida = (id, val) => setBebidaSel((s) => ({ ...s, [id]: val }));
 
   const toggle = (pasoId, opId, max) => {
@@ -856,7 +973,6 @@ function ArmaScreen({ state, go, cart, setCart, variant, kind = 'ensalada' }) {
     <>
       <Header onBack={() => go({ screen: 'home' })} title={labelTitulo} />
       <div className="pv-body" style={{ paddingBottom: 140 }}>
-        {/* Renderizado inline de pasos — no depende de salad.jsx */}
         <div>
           {arma.pasos.map((paso, pi) => {
             const selPaso = sel[paso.id] || [];
