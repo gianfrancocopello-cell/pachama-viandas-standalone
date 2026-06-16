@@ -1255,6 +1255,25 @@ function ConfirmScreen({ state, go, setCart }) {
   const codigo = useMemo(() => 'PV-' + Math.floor(Math.random() * 9000 + 1000), []);
   const D = window.MENU_DATA;
   const esTransferencia = state.form?.pago === 'transferencia';
+  const [soloRecibido, setSoloRecibido] = useState(false);
+  const fueOculta = useRef(false);
+
+  // Una vez que el cliente sale de la página (abre WhatsApp, cambia de app/pestaña)
+  // y vuelve, dejamos solo el mensaje "Recibimos tu pedido" con el tilde verde —
+  // sin los datos de transferencia ni el resto.
+  useEffect(() => {
+    const onVisibility = () => {
+      if (document.visibilityState === 'hidden') fueOculta.current = true;
+      else if (fueOculta.current) setSoloRecibido(true);
+    };
+    const onPageShow = (e) => { if (e.persisted) setSoloRecibido(true); };
+    document.addEventListener('visibilitychange', onVisibility);
+    window.addEventListener('pageshow', onPageShow);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibility);
+      window.removeEventListener('pageshow', onPageShow);
+    };
+  }, []);
 
   const copiar = (texto, key) => {
     try {
@@ -1277,7 +1296,7 @@ function ConfirmScreen({ state, go, setCart }) {
           Te llega hoy entre las <b>12:00 y 13:00</b>. Te avisamos por WhatsApp cuando salga del local.
         </div>
 
-        {esTransferencia && (
+        {!soloRecibido && esTransferencia && (
           <div className="pv-card" style={{ marginTop: 24, textAlign: 'left', background: 'var(--terracota-soft)', borderColor: 'transparent' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
               <span style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'oklch(0.4 0.12 40)' }}>Transferí para confirmar</span>
@@ -1334,6 +1353,7 @@ function ConfirmScreen({ state, go, setCart }) {
           </div>
         )}
 
+        {!soloRecibido && (
         <div className="pv-card" style={{ marginTop: esTransferencia ? 14 : 28, textAlign: 'left' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
             {Icon.pin('var(--terracota)')}
@@ -1346,6 +1366,7 @@ function ConfirmScreen({ state, go, setCart }) {
           <div style={{ height: 1, background: 'var(--crema-line)', margin: '14px 0' }} />
           <Row label="Total cobrado" value={window.formatPrecio(state.total || 0)} bold />
         </div>
+        )}
 
         <button className="pv-btn pv-btn-full pv-btn-ghost" style={{ marginTop: 16 }} onClick={() => {setCart([]);go({ screen: 'home' });}}>
           Volver al menú
