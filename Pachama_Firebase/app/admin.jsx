@@ -834,6 +834,102 @@ function BebidaVariantes({ bebida, onChange, onAgotados }) {
 }
 
 
+
+function BebidasGroup() {
+  const A = useAdmin();
+  const bebidas = window.MENU_DATA.bebidas || [];
+  const update = (next) => A.setOverride('bebidas', next);
+  const setCampo = (i, campo, val) => update(bebidas.map((b, j) => j === i ? { ...b, [campo]: val } : b));
+  const remove = (i) => update(bebidas.filter((_, j) => j !== i));
+  const add = () => update([...bebidas, { id: 'beb-' + Date.now().toString(36).slice(-5), nombre: 'Nueva bebida', precio: 0, activa: true, variantes: [] }]);
+  return (
+    <Group title="Bebidas">
+      <div style={{ fontSize: 11, color: 'var(--tierra-soft)', lineHeight: 1.4, marginBottom: 10 }}>
+        Se ofrecen como opción cuando el cliente pide una comida o arma su comida.
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        {bebidas.map((b, i) => (
+          <div key={b.id} style={{ background: 'var(--crema)', border: '1px solid var(--crema-line)', borderRadius: 12, padding: 10 }}>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <input
+                className="pv-input"
+                value={b.nombre}
+                onChange={(e) => setCampo(i, 'nombre', e.target.value)}
+                style={{ height: 38, fontSize: 13, flex: 1 }}
+              />
+              <button
+                onClick={() => remove(i)}
+                aria-label="Eliminar"
+                style={{
+                  appearance: 'none', border: 0, background: 'transparent',
+                  color: 'oklch(0.55 0.15 30)', cursor: 'pointer',
+                  width: 32, height: 32, borderRadius: 999, flexShrink: 0,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                  <path d="M5 7h14M9 7V5a1 1 0 011-1h4a1 1 0 011 1v2m1 0v12a2 2 0 01-2 2H9a2 2 0 01-2-2V7" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </button>
+            </div>
+            <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginTop: 8 }}>
+              <div style={{ position: 'relative', width: 120 }}>
+                <span style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--tierra-soft)', fontSize: 13, zIndex: 1 }}>$</span>
+                <PriceInput value={b.precio ?? 0} onCommit={(n) => setCampo(i, 'precio', n)} />
+              </div>
+              <div style={{ flex: 1 }} />
+              <span style={{ fontSize: 11, color: 'var(--tierra-soft)' }}>{b.activa ? 'Visible' : 'Oculta'}</span>
+              <button
+                onClick={() => setCampo(i, 'activa', !b.activa)}
+                role="switch"
+                aria-checked={!!b.activa}
+                style={{
+                  appearance: 'none', border: 0, width: 42, height: 24, borderRadius: 999,
+                  background: b.activa ? 'var(--terracota)' : 'var(--crema-line)',
+                  position: 'relative', cursor: 'pointer', padding: 0, flexShrink: 0,
+                }}>
+                <span style={{
+                  position: 'absolute', top: 2, left: b.activa ? 20 : 2,
+                  width: 20, height: 20, borderRadius: 999, background: 'var(--hueso)',
+                  boxShadow: '0 1px 2px rgba(0,0,0,0.15)',
+                }} />
+              </button>
+            </div>
+            {(b.variantes || []).filter(Boolean).length === 0 && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8 }}>
+                <span style={{ fontSize: 11, color: 'var(--tierra-soft)', flex: 1 }}>Estado de stock</span>
+                <button
+                  onClick={() => setCampo(i, 'agotado', !b.agotado)}
+                  style={{
+                    appearance: 'none', cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0,
+                    fontSize: 10.5, fontWeight: 700, letterSpacing: '0.04em',
+                    padding: '6px 12px', borderRadius: 999, border: '1px solid',
+                    borderColor: b.agotado ? 'oklch(0.55 0.2 28)' : 'var(--crema-line)',
+                    background: b.agotado ? 'oklch(0.55 0.2 28)' : 'transparent',
+                    color: b.agotado ? 'var(--hueso)' : 'var(--tierra-soft)',
+                  }}>
+                  {b.agotado ? 'Agotada' : 'Disponible'}
+                </button>
+              </div>
+            )}
+            <BebidaVariantes
+              bebida={b}
+              onChange={(vs) => setCampo(i, 'variantes', vs)}
+              onAgotados={(arr) => setCampo(i, 'agotados', arr)} />
+          </div>
+        ))}
+      </div>
+      <button
+        onClick={add}
+        style={{
+          marginTop: 10, appearance: 'none',
+          border: '1px dashed var(--terracota)', background: 'transparent',
+          color: 'var(--terracota)', padding: '10px 14px', borderRadius: 12,
+          fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', width: '100%',
+        }}>+ Agregar bebida</button>
+    </Group>
+  );
+}
+
 function DateField({ label, path }) {
   const A = useAdmin();
   const val = getByPath(window.MENU_DATA, path) ?? '';
