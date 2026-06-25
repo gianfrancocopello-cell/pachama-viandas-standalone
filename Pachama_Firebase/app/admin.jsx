@@ -47,7 +47,7 @@ function applyOverrides(overrides) {
   D.arma = JSON.parse(JSON.stringify(base.arma));
   if (base.armaComida) D.armaComida = JSON.parse(JSON.stringify(base.armaComida));
 
-  for (const path in overrides) {
+  for (const path of Object.keys(overrides).sort((a, b) => a.length - b.length)) {
     setByPath(D, path, overrides[path]);
   }
 }
