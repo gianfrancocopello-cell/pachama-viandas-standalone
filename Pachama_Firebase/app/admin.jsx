@@ -553,13 +553,20 @@ function ImageField({ label, id, autoNombre, autoCat }) {
   const A = useAdmin();
   const src = A.images[id];
   const inputRef = React.useRef(null);
+  const [uploading, setUploading] = React.useState(false);
 
-  const onPick = (e) => {
+  const onPick = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => A.setImage(id, reader.result);
-    reader.readAsDataURL(file);
+    setUploading(true);
+    await A.setImage(id, file);
+    setUploading(false);
+  };
+
+  const onGenerar = async () => {
+    setUploading(true);
+    await A.setImage(id, generarImagenPlato(autoNombre, autoCat));
+    setUploading(false);
   };
 
   return (
@@ -576,17 +583,19 @@ function ImageField({ label, id, autoNombre, autoCat }) {
           {!src && 'foto'}
         </div>
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 6 }}>
-          <button onClick={() => inputRef.current.click()} style={{
+          <button onClick={() => inputRef.current.click()} disabled={uploading} style={{
             appearance: 'none', border: '1px solid var(--crema-line)', background: 'var(--hueso)',
             padding: '8px 12px', borderRadius: 10, fontSize: 12, fontWeight: 500,
-            cursor: 'pointer', fontFamily: 'inherit', color: 'var(--tierra)',
-          }}>{src ? 'Cambiar imagen' : 'Subir imagen'}</button>
+            cursor: uploading ? 'not-allowed' : 'pointer', fontFamily: 'inherit', color: 'var(--tierra)',
+            opacity: uploading ? 0.6 : 1,
+          }}>{uploading ? 'Subiendo...' : src ? 'Cambiar imagen' : 'Subir imagen'}</button>
           {autoNombre !== undefined && (
-            <button onClick={() => A.setImage(id, generarImagenPlato(autoNombre, autoCat))} style={{
+            <button onClick={onGenerar} disabled={uploading} style={{
               appearance: 'none', border: '1px dashed var(--crema-line)', background: 'transparent',
               padding: '7px 12px', borderRadius: 10, fontSize: 11, fontWeight: 600,
-              cursor: 'pointer', fontFamily: 'inherit', color: 'var(--terracota)',
-            }}>Generar imagen automática</button>
+              cursor: uploading ? 'not-allowed' : 'pointer', fontFamily: 'inherit', color: 'var(--terracota)',
+              opacity: uploading ? 0.6 : 1,
+            }}>{uploading ? 'Generando...' : 'Generar imagen automática'}</button>
           )}
           {src && (
             <button onClick={() => A.clearImage(id)} style={{
