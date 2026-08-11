@@ -1125,8 +1125,6 @@ function generarDescripcion(nombre, cat) {
   return guarnicion ? `${base}. ${guarnicion}.` : `${base}.`;
 }
 
-const DESC_POR_DEFECTO = ['', 'Descripción del plato.'];
-
 function PlatosEditor() {
   const A = useAdmin();
   const D = window.MENU_DATA;
