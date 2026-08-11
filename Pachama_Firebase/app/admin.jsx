@@ -170,9 +170,18 @@ window.__pvAdmin = window.__pvAdmin || {
     deleteImageFromFirestore(id);
     this.notify();
   },
-  async setImage(id, file) {
+  async setImage(id, fileOrDataUrl) {
     if (!window.__storage) return;
     try {
+      let file;
+      // Handle dataURL string (from generarImagenPlato)
+      if (typeof fileOrDataUrl === 'string' && fileOrDataUrl.startsWith('data:')) {
+        const res = await fetch(fileOrDataUrl);
+        const blob = await res.blob();
+        file = new File([blob], 'imagen.jpg', { type: blob.type || 'image/jpeg' });
+      } else {
+        file = fileOrDataUrl;
+      }
       const ext = file.type.includes('png') ? 'png' : 'jpg';
       const ref = window.__storage.ref(`pv_images/${id}.${ext}`);
       await ref.put(file);
@@ -495,18 +504,62 @@ function NumberField({ label, path, prefix = '$' }) {
   );
 }
 
-function ImageField({ label, id }) {
+function generarImagenPlato(nombre, cat) {
+  const texto = (nombre || 'Plato').trim();
+  let h = 0;
+  for (let i = 0; i < texto.length; i++) h = (h * 31 + texto.charCodeAt(i)) % 360;
+  const hue = cat === 'ensaladas' ? 90 + (h % 60) : (h % 50) + 15;
+  const W = 800, H = 600;
+  const cv = document.createElement('canvas');
+  cv.width = W; cv.height = H;
+  const ctx = cv.getContext('2d');
+
+  const grad = ctx.createLinearGradient(0, 0, W, H);
+  grad.addColorStop(0, `hsl(${hue}, 42%, 82%)`);
+  grad.addColorStop(1, `hsl(${(hue + 24) % 360}, 34%, 62%)`);
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, W, H);
+
+  ctx.save();
+  ctx.translate(W / 2, H / 2 - 20);
+  ctx.fillStyle = 'rgba(255,255,255,0.92)';
+  ctx.beginPath(); ctx.arc(0, 0, 168, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = `hsl(${hue}, 38%, 74%)`;
+  ctx.beginPath(); ctx.arc(0, 0, 118, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = 'rgba(255,255,255,0.55)';
+  ctx.beginPath(); ctx.arc(-38, -34, 26, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = `hsl(${(hue + 40) % 360}, 45%, 58%)`;
+  ctx.beginPath(); ctx.arc(34, 18, 32, 0, Math.PI * 2); ctx.fill();
+  ctx.restore();
+
+  ctx.fillStyle = 'rgba(30, 26, 20, 0.9)';
+  ctx.textAlign = 'center';
+  ctx.font = '600 40px "DM Sans", system-ui, sans-serif';
+  const palabras = texto.toUpperCase().split(/\s+/);
+  const lineas = [];
+  let linea = '';
+  palabras.forEach((w) => {
+    const test = linea ? `${linea} ${w}` : w;
+    if (ctx.measureText(test).width > W - 120 && linea) { lineas.push(linea); linea = w; }
+    else linea = test;
+  });
+  if (linea) lineas.push(linea);
+  lineas.slice(0, 2).forEach((l, i) => ctx.fillText(l, W / 2, H - 96 + i * 46));
+
+  return cv.toDataURL('image/jpeg', 0.85);
+}
+
+function ImageField({ label, id, autoNombre, autoCat }) {
   const A = useAdmin();
   const src = A.images[id];
   const inputRef = React.useRef(null);
 
-  const [uploading, setUploading] = React.useState(false);
-  const onPick = async (e) => {
+  const onPick = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    setUploading(true);
-    await A.setImage(id, file);
-    setUploading(false);
+    const reader = new FileReader();
+    reader.onload = () => A.setImage(id, reader.result);
+    reader.readAsDataURL(file);
   };
 
   return (
@@ -527,7 +580,14 @@ function ImageField({ label, id }) {
             appearance: 'none', border: '1px solid var(--crema-line)', background: 'var(--hueso)',
             padding: '8px 12px', borderRadius: 10, fontSize: 12, fontWeight: 500,
             cursor: 'pointer', fontFamily: 'inherit', color: 'var(--tierra)',
-          }}>{uploading ? 'Subiendo...' : src ? 'Cambiar imagen' : 'Subir imagen'}</button>
+          }}>{src ? 'Cambiar imagen' : 'Subir imagen'}</button>
+          {autoNombre !== undefined && (
+            <button onClick={() => A.setImage(id, generarImagenPlato(autoNombre, autoCat))} style={{
+              appearance: 'none', border: '1px dashed var(--crema-line)', background: 'transparent',
+              padding: '7px 12px', borderRadius: 10, fontSize: 11, fontWeight: 600,
+              cursor: 'pointer', fontFamily: 'inherit', color: 'var(--terracota)',
+            }}>Generar imagen automática</button>
+          )}
           {src && (
             <button onClick={() => A.clearImage(id)} style={{
               appearance: 'none', border: 0, background: 'transparent',
@@ -1030,6 +1090,42 @@ function OpcionesEditor() {
     </div>
   );
 }
+
+const DESC_POR_DEFECTO = ['', 'Descripción del plato.'];
+
+function generarDescripcion(nombre, cat) {
+  const limpio = (nombre || '').trim();
+  if (!limpio) return '';
+  const n = limpio.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
+  // Guarnición indicada en el nombre: "c/Ensalada", "con arroz", etc.
+  let guarnicion = '';
+  const g = n.match(/(?:c\/|con\s+)([a-z\s]+)$/);
+  if (g) {
+    const gg = g[1].trim();
+    const mapa = {
+      ensalada: 'Se sirve con ensalada fresca',
+      arroz: 'Se sirve con arroz',
+      pure: 'Se sirve con puré casero',
+      fritas: 'Se sirve con papas fritas',
+      papas: 'Se sirve con papas',
+      salsa: 'Se sirve con salsa casera',
+      verduras: 'Se sirve con verduras salteadas',
+    };
+    const key = Object.keys(mapa).find((k) => gg.includes(k));
+    if (key) guarnicion = mapa[key];
+  }
+
+  const reglas = cat === 'ensaladas' ? DESC_ENSALADA_ING : DESC_REGLAS;
+  const hit = reglas.find((r) => r[0].test(n));
+  const base = hit ? hit[1] : (cat === 'ensaladas'
+    ? 'Ensalada fresca preparada en el día con ingredientes de estación'
+    : 'Plato casero preparado en el día con ingredientes frescos');
+
+  return guarnicion ? `${base}. ${guarnicion}.` : `${base}.`;
+}
+
+const DESC_POR_DEFECTO = ['', 'Descripción del plato.'];
 
 function PlatosEditor() {
   const A = useAdmin();
