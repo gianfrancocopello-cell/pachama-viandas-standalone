@@ -171,36 +171,58 @@ window.__pvAdmin = window.__pvAdmin || {
     this.notify();
   },
   async setImage(id, fileOrDataUrl) {
-    if (!window.__storage) return;
     try {
-      let file;
-      // Handle dataURL string (from generarImagenPlato)
+      // Convert to dataURL if it's a File
+      let dataUrl;
       if (typeof fileOrDataUrl === 'string' && fileOrDataUrl.startsWith('data:')) {
-        const res = await fetch(fileOrDataUrl);
-        const blob = await res.blob();
-        file = new File([blob], 'imagen.jpg', { type: blob.type || 'image/jpeg' });
+        dataUrl = fileOrDataUrl;
       } else {
-        file = fileOrDataUrl;
+        dataUrl = await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result);
+          reader.onerror = reject;
+          reader.readAsDataURL(fileOrDataUrl);
+        });
       }
-      const ext = file.type.includes('png') ? 'png' : 'jpg';
-      const ref = window.__storage.ref(`pv_images/${id}.${ext}`);
-      await ref.put(file);
-      const url = await ref.getDownloadURL();
-      const next = { ...this.images, [id]: url };
-      delete next[`${id}.mobile`];
-      delete next[`${id}.tablet`];
-      delete next[`${id}.desktop`];
+
+      // Resize and compress image to keep Firestore size small (< 200KB)
+      const compressed = await new Promise((resolve) => {
+        const img = new Image();
+        img.onload = () => {
+          const MAX = 800;
+          let w = img.width, h = img.height;
+          if (w > MAX || h > MAX) {
+            if (w > h) { h = Math.round(h * MAX / w); w = MAX; }
+            else { w = Math.round(w * MAX / h); h = MAX; }
+          }
+          const cv = document.createElement('canvas');
+          cv.width = w; cv.height = h;
+          cv.getContext('2d').drawImage(img, 0, 0, w, h);
+          // Compress at 0.65 quality
+          let quality = 0.65;
+          let result = cv.toDataURL('image/jpeg', quality);
+          // If still too large, compress more
+          while (result.length > 150000 && quality > 0.2) {
+            quality -= 0.1;
+            result = cv.toDataURL('image/jpeg', quality);
+          }
+          resolve(result);
+        };
+        img.src = dataUrl;
+      });
+
+      // Save directly to Firestore (no Storage needed)
+      const next = { ...this.images, [id]: compressed };
       this.images = next;
-      saveJSON(LS_IMAGES, this.images);
-      // Guardar solo el campo nuevo en Firestore
+      saveJSON(LS_IMAGES, next);
       if (window.__db) {
         const update = {};
-        update[id] = url;
+        update[id] = compressed;
         window.__db.doc(FS_IMAGES_DOC).set(update, { merge: true }).catch(console.error);
       }
       this.notify();
     } catch (err) {
-      console.error('Error subiendo imagen:', err);
+      console.error('Error guardando imagen:', err);
     }
   },
   resetAll() {
@@ -588,14 +610,14 @@ function ImageField({ label, id, autoNombre, autoCat }) {
             padding: '8px 12px', borderRadius: 10, fontSize: 12, fontWeight: 500,
             cursor: uploading ? 'not-allowed' : 'pointer', fontFamily: 'inherit', color: 'var(--tierra)',
             opacity: uploading ? 0.6 : 1,
-          }}>{uploading ? 'Subiendo...' : src ? 'Cambiar imagen' : 'Subir imagen'}</button>
+          }}>{uploading ? 'Guardando...' : src ? 'Cambiar imagen' : 'Subir imagen'}</button>
           {autoNombre !== undefined && (
             <button onClick={onGenerar} disabled={uploading} style={{
               appearance: 'none', border: '1px dashed var(--crema-line)', background: 'transparent',
               padding: '7px 12px', borderRadius: 10, fontSize: 11, fontWeight: 600,
               cursor: uploading ? 'not-allowed' : 'pointer', fontFamily: 'inherit', color: 'var(--terracota)',
               opacity: uploading ? 0.6 : 1,
-            }}>{uploading ? 'Generando...' : 'Generar imagen automática'}</button>
+            }}>{uploading ? 'Guardando...' : 'Generar imagen automática'}</button>
           )}
           {src && (
             <button onClick={() => A.clearImage(id)} style={{
