@@ -425,7 +425,8 @@ function DishCard({ plato, onTap }) {
 
   const op1 = plato.precioOp1 ?? plato.precio;
   const op2 = plato.precioOp2 ?? plato.precio;
-  const precioMenor = Math.min(op1, op2);
+  const preciosDisp = [!plato.op1Off ? op1 : null, !plato.op2Off ? op2 : null].filter((x) => x != null);
+  const precioMenor = preciosDisp.length ? Math.min(...preciosDisp) : Math.min(op1, op2);
   const hayDesc = window.descuentoPlatosVigente ? window.descuentoPlatosVigente() : false;
   const precioMenorFinal = window.aplicarDescuento ? window.aplicarDescuento(precioMenor) : precioMenor;
   const mostrarPrecio = agotado ? 'No disponible' : null;
@@ -715,9 +716,25 @@ function BebidasAddon({ seleccion, onSelect }) {
 
 // ── DETALLE ──
 function DetalleScreen({ state, go, cart, setCart }) {
-  const p = state.plato;
+  // Leer el plato en tiempo real desde MENU_DATA para reflejar cambios del admin (op1Off, op2Off, etc.)
+  const A = useAdmin();
+  const snapshotPlato = state.plato;
+  const cat = state.categoria;
+  const livePlato = useMemo(() => {
+    const ops = [1, 2];
+    for (const op of ops) {
+      const arr = window.MENU_DATA?.platos?.[cat]?.[op] || [];
+      const found = arr.find(x => x.id === snapshotPlato?.id);
+      if (found) return found;
+    }
+    return snapshotPlato;
+  }, [A, snapshotPlato?.id, cat]);
+  const p = livePlato;
+  // Opciones de porción habilitadas desde el panel (op1Off / op2Off)
+  const opcionesDisp = [1, 2].filter((n) => !(n === 1 ? p.op1Off : p.op2Off));
   const [qty, setQty] = useState(1);
-  const [opcionElegida, setOpcionElegida] = useState(null); // 1 o 2
+  // Si solo hay una porción habilitada, queda elegida por defecto
+  const [opcionElegida, setOpcionElegida] = useState(opcionesDisp.length === 1 ? opcionesDisp[0] : null);
   const [errorOpcion, setErrorOpcion] = useState(false);
   const [bebidaSel, setBebidaSel] = useState({});
   const compls = p.complementarios || [];
@@ -823,9 +840,9 @@ function DetalleScreen({ state, go, cart, setCart }) {
 
         {/* Selector Opción 1 / Opción 2 */}
         <div style={{ marginTop: 26 }}>
-          <div className="pv-eyebrow" style={{ marginBottom: 8 }}>Elegí una opción</div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-            {[1, 2].map((n) => {
+          <div className="pv-eyebrow" style={{ marginBottom: 8 }}>{opcionesDisp.length === 1 ? 'Porción' : 'Elegí una opción'}</div>
+          <div style={{ display: 'grid', gridTemplateColumns: opcionesDisp.length === 1 ? '1fr' : '1fr 1fr', gap: 10 }}>
+            {opcionesDisp.map((n) => {
               const sel = opcionElegida === n;
               const precioN = n === 1 ? precioOp1 : precioOp2;
               return (
@@ -870,6 +887,11 @@ function DetalleScreen({ state, go, cart, setCart }) {
               );
             })}
           </div>
+          {opcionesDisp.length === 0 && (
+            <div style={{ fontSize: 13, color: 'var(--tierra-soft)', padding: '14px 16px', border: '1.5px dashed var(--crema-line)', borderRadius: 14 }}>
+              Este plato no tiene porciones disponibles por el momento.
+            </div>
+          )}
           {errorOpcion && (
             <div style={{ fontSize: 12, color: 'oklch(0.5 0.2 28)', marginTop: 8 }}>
               Por favor, seleccioná Opción 1 u Opción 2 para continuar.
@@ -1253,8 +1275,6 @@ function CheckoutScreen({ go, cart, setCart }) {
 function ConfirmScreen({ state, go, setCart }) {
   const [copiado, setCopiado] = useState('');
   const codigo = useMemo(() => 'PV-' + Math.floor(Math.random() * 9000 + 1000), []);
-  const D = window.MENU_DATA;
-  const esTransferencia = state.form?.pago === 'transferencia';
   const [soloRecibido, setSoloRecibido] = useState(false);
   const fueOculta = useRef(false);
 
@@ -1274,6 +1294,8 @@ function ConfirmScreen({ state, go, setCart }) {
       window.removeEventListener('pageshow', onPageShow);
     };
   }, []);
+  const D = window.MENU_DATA;
+  const esTransferencia = state.form?.pago === 'transferencia';
 
   const copiar = (texto, key) => {
     try {
@@ -1368,9 +1390,11 @@ function ConfirmScreen({ state, go, setCart }) {
         </div>
         )}
 
+        {!soloRecibido && (
         <button className="pv-btn pv-btn-full pv-btn-ghost" style={{ marginTop: 16 }} onClick={() => {setCart([]);go({ screen: 'home' });}}>
           Volver al menú
         </button>
+        )}
       </div>
     </>);
 
