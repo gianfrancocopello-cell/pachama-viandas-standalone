@@ -833,8 +833,6 @@ function BebidaVariantes({ bebida, onChange, onAgotados }) {
   );
 }
 
-
-
 function BebidasGroup() {
   const A = useAdmin();
   const bebidas = window.MENU_DATA.bebidas || [];
@@ -1049,7 +1047,7 @@ function PlatosEditor() {
     const nuevo = {
       id,
       nombre: 'Nuevo plato',
-      desc: 'Descripción del plato.',
+      desc: '',
       precio: 0,
       tags: [],
       complementarios: ['Salsa César', 'Sobrecito de limón', 'Tostaditas'],
@@ -1058,6 +1056,7 @@ function PlatosEditor() {
       oculto: false,
     };
     A.setOverrideArray(`platos.${cat}.${op}`, [...D.platos[cat][op], nuevo]);
+    A.setImage(`plato.${id}`, generarImagenPlato(nuevo.nombre, cat));
   };
 
   const removePlato = (cat, op, id) => {
@@ -1067,12 +1066,24 @@ function PlatosEditor() {
     A.clearImage(`plato.${id}`);
   };
 
+  const removeTodos = (cat) => {
+    const total = (D.platos[cat][1] || []).length + (D.platos[cat][2] || []).length;
+    if (!total) return;
+    const nombre = cat === 'ensaladas' ? 'las ensaladas' : 'las comidas';
+    if (!confirm(`¿Eliminar ${nombre} del menú (${total})? Se perderán sus textos e imágenes.`)) return;
+    [1, 2].forEach((op) => {
+      (D.platos[cat][op] || []).forEach((p) => A.clearImage(`plato.${p.id}`));
+      A.setOverrideArray(`platos.${cat}.${op}`, []);
+    });
+  };
+
   return (
     <div>
       <div className="pv-tabs" style={{ marginBottom: 18 }}>
         {[
         { id: 'ensaladas', label: 'Ensaladas' },
-        { id: 'comidas', label: 'Comidas' }].
+        { id: 'comidas', label: 'Comidas' },
+        { id: 'bebidas', label: 'Bebidas' }].
         map((t) =>
         <div
           key={t.id}
@@ -1082,9 +1093,24 @@ function PlatosEditor() {
           {t.label}</div>
         )}
       </div>
+      {catTab === 'bebidas' ? (
+        <BebidasGroup />
+      ) : (
       <div style={{ marginBottom: 26 }}>
-        <div className="pv-h3" style={{ fontSize: 18, marginBottom: 12 }}>
-          {catTab === 'ensaladas' ? 'Ensaladas' : 'Comidas'}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 12 }}>
+          <div className="pv-h3" style={{ fontSize: 18, margin: 0 }}>
+            {catTab === 'ensaladas' ? 'Ensaladas' : 'Comidas'}
+          </div>
+          {visiblePlatos.length > 0 && (
+            <button
+              onClick={() => removeTodos(catTab)}
+              style={{
+                appearance: 'none', cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0,
+                border: '1px solid oklch(0.55 0.15 30)', background: 'transparent',
+                color: 'oklch(0.55 0.15 30)', padding: '7px 14px', borderRadius: 999,
+                fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap',
+              }}>Eliminar todas</button>
+          )}
         </div>
         {visiblePlatos.map((p) => {
           const op = p.__op;
@@ -1110,11 +1136,13 @@ function PlatosEditor() {
                   </svg>
                 </button>
               </div>
-              <ImageField label="Imagen del plato" id={`plato.${p.id}`} />
+              <ImageField label="Imagen del plato" id={`plato.${p.id}`} autoNombre={p.nombre} autoCat={catTab} />
               <PlatoText cat={catTab} op={op} plato={p} field="nombre" />
               <PlatoText cat={catTab} op={op} plato={p} field="desc" multi />
-              <PlatoNumber cat={catTab} op={op} plato={p} field="precioOp1" label="Precio Opción 1" />
-              <PlatoNumber cat={catTab} op={op} plato={p} field="precioOp2" label="Precio Opción 2" />
+              <PlatoNumber cat={catTab} op={op} plato={p} field="precioOp1" label="Precio Porción Abundante" />
+              <PlatoNumber cat={catTab} op={op} plato={p} field="precioOp2" label="Precio Porción Liviana" />
+              <PlatoToggle cat={catTab} op={op} plato={p} field="op1Off" label="Deshabilitar Porción Abundante" />
+              <PlatoToggle cat={catTab} op={op} plato={p} field="op2Off" label="Deshabilitar Porción Liviana" />
               <PlatoToggle cat={catTab} op={op} plato={p} field="agotado" label="Marcar como agotado" />
               <PlatoToggle cat={catTab} op={op} plato={p} field="oculto" label="Ocultar del menú" />
 
@@ -1134,6 +1162,7 @@ function PlatosEditor() {
             fontFamily: 'inherit', width: '100%',
           }}>+ Agregar plato</button>
       </div>
+      )}
     </div>
   );
 }
