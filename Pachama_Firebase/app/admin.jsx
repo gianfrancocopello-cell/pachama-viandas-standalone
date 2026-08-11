@@ -1274,11 +1274,75 @@ function updatePlatoField(cat, op, platoId, field, value) {
   A.setOverrideArray(`platos.${cat}.${op}`, next);
 }
 
+function updatePlatoFields(cat, op, platoId, cambios) {
+  const A = window.__pvAdmin;
+  const arr = window.MENU_DATA.platos[cat][op];
+  const next = arr.map((p) => p.id === platoId ? { ...p, ...cambios } : p);
+  A.setOverrideArray(`platos.${cat}.${op}`, next);
+}
+
+// ─── Descripción automática a partir del nombre del plato ───
+const DESC_REGLAS = [
+  [/milanesa.*napolitana/, 'Milanesa casera al horno con salsa de tomate, jamón y muzzarella gratinada'],
+  [/milanesa.*(carne|ternera)/, 'Milanesa de carne al horno, rebozada a mano y dorada en el momento'],
+  [/milanesa.*(pollo|ave)/, 'Milanesa de pollo al horno, rebozada a mano y dorada en el momento'],
+  [/milanesa/, 'Milanesa casera al horno, rebozada a mano y dorada en el momento'],
+  [/pechuga|suprema/, 'Pechuga de pollo grillada, jugosa y condimentada con hierbas frescas'],
+  [/bondiola/, 'Bondiola de cerdo cocinada lentamente hasta quedar tierna y jugosa'],
+  [/bife|churrasco/, 'Bife de carne a la plancha, en su punto justo'],
+  [/matambre/, 'Matambre tierno cocinado al horno, cortado en porciones generosas'],
+  [/guiso.*lenteja/, 'Guiso de lentejas casero, cocinado a fuego lento con verduras y chorizo colorado'],
+  [/guiso|estofado/, 'Guiso casero cocinado a fuego lento, bien condimentado'],
+  [/canelones/, 'Canelones caseros de masa fina, rellenos y gratinados al horno'],
+  [/ravioles|sorrentinos|pasta|noquis/, 'Pasta casera del día, hecha en el momento'],
+  [/lasagna|lasana/, 'Lasagna casera en capas, con salsa y queso gratinado al horno'],
+  [/tarta.*espinaca/, 'Tarta de espinaca con masa casera, cremosa y bien rellena'],
+  [/tarta.*zapallito/, 'Tarta de zapallito con masa casera, suave y bien rellena'],
+  [/tarta.*pollo/, 'Tarta de pollo con masa casera, bien rellena y dorada al horno'],
+  [/tarta|empanada/, 'Preparación casera con masa hecha en el momento y relleno abundante'],
+  [/pastel de papa/, 'Pastel de papa casero, con carne condimentada y puré gratinado'],
+  [/albondiga/, 'Albóndigas caseras en salsa de tomate natural'],
+  [/pollo/, 'Pollo casero cocinado al horno, tierno y bien condimentado'],
+  [/cerdo/, 'Cerdo cocinado al horno, tierno y sabroso'],
+  [/pescado|merluza|salmon/, 'Pescado fresco cocinado al horno, suave y liviano'],
+  [/tortilla|revuelto/, 'Preparación casera de huevo y verduras, hecha en el momento'],
+  [/wok|salteado/, 'Salteado de vegetales frescos con salsa de la casa'],
+];
+
+const DESC_ENSALADA_ING = [
+  [/tricolor/, 'Fideos tricolores, tomate cherry, aceitunas y queso'],
+  [/cumbre/, 'Mix de hojas verdes, tomate cherry, pepino, queso y nueces'],
+  [/andina/, 'Hojas verdes, cebolla morada, zanahoria, aceitunas y tomate cherry'],
+  [/zeus/, 'Lechuga, rúcula, zanahoria, tomate cherry, quinoa y langostinos'],
+  [/frutos secos/, 'Rúcula, lechuga, zanahoria, queso, pollo, nueces, castañas y almendras'],
+  [/verano/, 'Hojas verdes, palta, tomate cherry, zanahoria y queso'],
+  [/pacha/, 'Hojas verdes, palta, tomate cherry, choclo y queso'],
+  [/pollo/, 'Hojas verdes, pollo grillado, zanahoria, pepino y huevo'],
+  [/cesar/, 'Mix de hojas, pollo grillado, parmesano en escamas y croutones'],
+  [/caprese/, 'Tomate, muzzarella fresca, albahaca y aceite de oliva'],
+  [/quinoa/, 'Quinoa, palta, tomate cherry, semillas y limón'],
+  [/rusa/, 'Papa, zanahoria y arvejas con mayonesa casera'],
+  [/mixta|verde|simple/, 'Lechuga, tomate y zanahoria con aderezo de la casa'],
+];
+
 function PlatoText({ cat, op, plato, field, multi = false }) {
   const value = plato[field] ?? '';
   return (
     <div className="pv-field">
-      <label className="pv-label">{multi ? 'Descripción' : 'Nombre'}</label>
+      <label className="pv-label" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+        <span>{multi ? 'Descripción' : 'Nombre'}</span>
+        {multi && (
+          <button
+            onClick={() => updatePlatoField(cat, op, plato.id, 'desc', generarDescripcion(plato.nombre, cat))}
+            title="Generar una descripción a partir del nombre"
+            style={{
+              appearance: 'none', cursor: 'pointer', fontFamily: 'inherit',
+              border: '1px solid var(--crema-line)', background: 'transparent',
+              color: 'var(--terracota)', padding: '4px 10px', borderRadius: 999,
+              fontSize: 10, fontWeight: 700, letterSpacing: '0.04em',
+            }}>Generar</button>
+        )}
+      </label>
       {multi ? (
         <textarea
           className="pv-input"
@@ -1290,7 +1354,15 @@ function PlatoText({ cat, op, plato, field, multi = false }) {
         <input
           className="pv-input"
           value={value}
-          onChange={(e) => updatePlatoField(cat, op, plato.id, field, e.target.value)}
+          onChange={(e) => {
+            const nombre = e.target.value;
+            // Si la descripción está vacía, es la de por defecto, o fue generada
+            // automáticamente, se vuelve a generar sola con el nombre nuevo.
+            const descActual = (plato.desc || '').trim();
+            const esAuto = DESC_POR_DEFECTO.includes(descActual) || descActual === generarDescripcion(value, cat);
+            if (esAuto) updatePlatoFields(cat, op, plato.id, { nombre, desc: generarDescripcion(nombre, cat) });
+            else updatePlatoField(cat, op, plato.id, field, nombre);
+          }}
         />
       )}
     </div>
