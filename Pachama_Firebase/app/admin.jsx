@@ -17,17 +17,21 @@ function saveJSON(key, val) {
 
 // ---------- Firestore sync ----------
 const FS_DOC = 'menu/overrides';
-const FS_IMAGES_DOC = 'menu/images';
+const FS_IMAGES_COL = 'pv_images'; // Colección - un documento por imagen
 
 function saveOverridesToFirestore(overrides) {
   if (!window.__db) return;
   window.__db.doc(FS_DOC).set({ data: overrides }).catch(console.error);
 }
+function saveImageToFirestore(id, url) {
+  if (!window.__db) return;
+  const docId = id.replace(/\./g, '_');
+  window.__db.collection(FS_IMAGES_COL).doc(docId).set({ id, url }).catch(console.error);
+}
 function deleteImageFromFirestore(id) {
   if (!window.__db) return;
-  const update = {};
-  update[id] = firebase.firestore.FieldValue.delete();
-  window.__db.doc(FS_IMAGES_DOC).update(update).catch(console.error);
+  const docId = id.replace(/\./g, '_');
+  window.__db.collection(FS_IMAGES_COL).doc(docId).delete().catch(console.error);
 }
 
 // ---------- Apply overrides to MENU_DATA (mutates) ----------
@@ -116,8 +120,12 @@ window.__pvAdmin = window.__pvAdmin || {
       applyOverrides(remote);
       this.notify();
     }, console.error);
-    this._fsImgUnsub = window.__db.doc(FS_IMAGES_DOC).onSnapshot((snap) => {
-      const remote = snap.exists ? (snap.data() || {}) : {};
+    this._fsImgUnsub = window.__db.collection(FS_IMAGES_COL).onSnapshot((snap) => {
+      const remote = {};
+      snap.forEach((doc) => {
+        const data = doc.data();
+        if (data.id && data.url) remote[data.id] = data.url;
+      });
       this.images = remote;
       saveJSON(LS_IMAGES, remote);
       this.notify();
@@ -211,15 +219,11 @@ window.__pvAdmin = window.__pvAdmin || {
         img.src = dataUrl;
       });
 
-      // Save directly to Firestore (no Storage needed)
+      // Save directly to Firestore as separate doc (no size limit issues)
       const next = { ...this.images, [id]: compressed };
       this.images = next;
       saveJSON(LS_IMAGES, next);
-      if (window.__db) {
-        const update = {};
-        update[id] = compressed;
-        window.__db.doc(FS_IMAGES_DOC).set(update, { merge: true }).catch(console.error);
-      }
+      saveImageToFirestore(id, compressed);
       this.notify();
     } catch (err) {
       console.error('Error guardando imagen:', err);
@@ -231,7 +235,12 @@ window.__pvAdmin = window.__pvAdmin || {
     saveJSON(LS_OVERRIDES, {});
     saveJSON(LS_IMAGES, {});
     saveOverridesToFirestore({});
-    if (window.__db) window.__db.doc(FS_IMAGES_DOC).set({}).catch(console.error);
+    if (window.__db) {
+      // Delete all docs in collection
+      window.__db.collection(FS_IMAGES_COL).get().then((snap) => {
+        snap.forEach((doc) => doc.ref.delete());
+      }).catch(console.error);
+    }
     applyOverrides({});
     this.notify();
   },
