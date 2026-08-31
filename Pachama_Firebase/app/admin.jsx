@@ -1165,6 +1165,178 @@ function generarDescripcion(nombre, cat) {
   return guarnicion ? `${base}. ${guarnicion}.` : `${base}.`;
 }
 
+function PorcionRow({ nombre, placeholder, precio, activa, imgId, fallbackImgId, onNombre, onPrecio, onToggle, onRemove }) {
+  const A = useAdmin();
+  const inputRef = React.useRef(null);
+  const propia = imgId ? A.images[imgId] : undefined;
+  const src = propia || (fallbackImgId ? A.images[fallbackImgId] : undefined);
+  const onPick = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => A.setImage(imgId, reader.result);
+    reader.readAsDataURL(file);
+    e.target.value = '';
+  };
+  return (
+    <div style={{
+      display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap',
+      background: 'var(--crema)', border: '1px solid var(--crema-line)',
+      borderRadius: 12, padding: 8,
+      opacity: activa ? 1 : 0.6,
+    }}>
+      {imgId && (
+        <button
+          onClick={() => inputRef.current.click()}
+          title={propia ? 'Cambiar la foto de esta opción' : 'Subir una foto para esta opción'}
+          className={src ? '' : 'pv-img pv-img-veg'}
+          style={{
+            appearance: 'none', cursor: 'pointer', padding: 0, flexShrink: 0,
+            width: 44, height: 44, borderRadius: 10, fontSize: 8,
+            border: propia ? '1px solid var(--verde)' : '1px dashed var(--crema-line)',
+            ...(src ? { backgroundImage: `url(${src})`, backgroundSize: 'cover', backgroundPosition: 'center' } : {}),
+          }}>{src ? '' : 'foto'}</button>
+      )}
+      {imgId && <input ref={inputRef} type="file" accept="image/*" onChange={onPick} style={{ display: 'none' }} />}
+      <input
+        className="pv-input"
+        value={nombre ?? ''}
+        placeholder={placeholder}
+        onChange={(e) => onNombre(e.target.value)}
+        style={{ flex: '1 1 130px', minWidth: 0, height: 36, fontSize: 13, padding: '0 10px' }}
+      />
+      <div style={{ position: 'relative', flex: '0 0 110px' }}>
+        <span style={{
+          position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)',
+          color: 'var(--tierra-soft)', fontSize: 13,
+        }}>$</span>
+        <input
+          className="pv-input"
+          type="text"
+          inputMode="numeric"
+          value={String(precio ?? 0)}
+          onChange={(e) => {
+            const v = e.target.value;
+            if (v === '' || /^\d*$/.test(v)) onPrecio(v === '' ? 0 : parseInt(v, 10));
+          }}
+          style={{ height: 36, fontSize: 13, padding: '0 10px 0 22px' }}
+        />
+      </div>
+      <button
+        onClick={onToggle}
+        role="switch"
+        aria-checked={activa}
+        title={activa ? 'Habilitada' : 'Deshabilitada'}
+        style={{
+          appearance: 'none', border: 0, width: 42, height: 24, borderRadius: 999,
+          background: activa ? 'var(--verde)' : 'var(--crema-line)',
+          position: 'relative', cursor: 'pointer', padding: 0, flexShrink: 0,
+        }}>
+        <span style={{
+          position: 'absolute', top: 2, left: activa ? 20 : 2,
+          width: 20, height: 20, borderRadius: 999, background: 'var(--hueso)',
+          transition: 'left .15s', boxShadow: '0 1px 2px rgba(0,0,0,0.15)',
+        }} />
+      </button>
+      {imgId && propia && (
+        <button
+          onClick={() => A.clearImage(imgId)}
+          title="Quitar la foto de esta opción"
+          style={{
+            appearance: 'none', border: 0, background: 'transparent', cursor: 'pointer',
+            fontSize: 10, color: 'var(--terracota)', fontFamily: 'inherit', padding: 0, flexShrink: 0,
+          }}>Quitar foto</button>
+      )}
+      {onRemove ? (
+        <button
+          onClick={onRemove}
+          title="Eliminar opción"
+          style={{
+            appearance: 'none', cursor: 'pointer', border: '1px solid var(--crema-line)',
+            background: 'var(--hueso)', color: 'var(--tierra-soft)',
+            width: 30, height: 30, borderRadius: 999, flexShrink: 0, fontSize: 14, lineHeight: 1,
+          }}>×</button>
+      ) : (
+        <span style={{ width: 30, flexShrink: 0 }} />
+      )}
+    </div>
+  );
+}
+
+// Opciones de precio del plato: las dos base + las extra.
+function PlatoPorciones({ cat, op, plato }) {
+  const items = plato.porcionesExtra || [];
+  const update = (next) => updatePlatoField(cat, op, plato.id, 'porcionesExtra', next);
+  const setCampo = (i, campo, val) => update(items.map((x, j) => j === i ? { ...x, [campo]: val } : x));
+  const add = () => update([...items, {
+    id: 'px' + Date.now().toString(36),
+    nombre: 'Nueva opción',
+    precio: plato.precioOp1 ?? plato.precio ?? 0,
+    off: false,
+  }]);
+  const A = useAdmin();
+  const remove = (i) => {
+    if (!confirm('¿Eliminar esta opción de precio? También se borra su foto.')) return;
+    const it = items[i];
+    A.clearImage(`plato.${plato.id}.ex${it?.id ?? i}`);
+    update(items.filter((_, j) => j !== i));
+  };
+  return (
+    <div className="pv-field">
+      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 6 }}>
+        <label className="pv-label" style={{ margin: 0 }}>Opciones de precio · {items.length + 2}</label>
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <PorcionRow
+          nombre={plato.op1Label ?? ''}
+          placeholder="Porción Abundante"
+          precio={plato.precioOp1 ?? plato.precio}
+          activa={!plato.op1Off}
+          imgId={`plato.${plato.id}.op1`}
+          fallbackImgId={`plato.${plato.id}`}
+          onNombre={(v) => updatePlatoField(cat, op, plato.id, 'op1Label', v)}
+          onPrecio={(v) => updatePlatoField(cat, op, plato.id, 'precioOp1', v)}
+          onToggle={() => updatePlatoField(cat, op, plato.id, 'op1Off', !plato.op1Off)}
+        />
+        <PorcionRow
+          nombre={plato.op2Label ?? ''}
+          placeholder="Porción Liviana"
+          precio={plato.precioOp2 ?? plato.precio}
+          activa={!plato.op2Off}
+          imgId={`plato.${plato.id}.op2`}
+          fallbackImgId={`plato.${plato.id}`}
+          onNombre={(v) => updatePlatoField(cat, op, plato.id, 'op2Label', v)}
+          onPrecio={(v) => updatePlatoField(cat, op, plato.id, 'precioOp2', v)}
+          onToggle={() => updatePlatoField(cat, op, plato.id, 'op2Off', !plato.op2Off)}
+        />
+        {items.map((x, j) => (
+          <PorcionRow
+            key={x.id ?? j}
+            nombre={x.nombre ?? ''}
+            placeholder="Nombre de la opción"
+            precio={x.precio}
+            activa={!x.off}
+            imgId={`plato.${plato.id}.ex${x.id ?? j}`}
+            fallbackImgId={`plato.${plato.id}`}
+            onNombre={(v) => setCampo(j, 'nombre', v)}
+            onPrecio={(v) => setCampo(j, 'precio', v)}
+            onToggle={() => setCampo(j, 'off', !x.off)}
+            onRemove={() => remove(j)}
+          />
+        ))}
+      </div>
+      <button
+        onClick={add}
+        style={{
+          marginTop: 8, appearance: 'none', cursor: 'pointer', fontFamily: 'inherit',
+          border: '1px dashed var(--terracota)', background: 'transparent',
+          color: 'var(--terracota)', padding: '8px 14px', borderRadius: 999,
+          fontSize: 12, fontWeight: 600,
+        }}>+ Agregar opción de precio</button>
+    </div>
+  );
+}
+
 function PlatosEditor() {
   const A = useAdmin();
   const D = window.MENU_DATA;
@@ -1195,9 +1367,10 @@ function PlatosEditor() {
 
   const removePlato = (cat, op, id) => {
     if (!confirm('¿Eliminar este plato? Se perderán sus textos e imagen.')) return;
+    const viejo = (D.platos[cat][op] || []).find((p) => p.id === id);
     const next = D.platos[cat][op].filter((p) => p.id !== id);
     A.setOverrideArray(`platos.${cat}.${op}`, next);
-    A.clearImage(`plato.${id}`);
+    limpiarImagenesPlato(A, viejo || { id });
   };
 
   const removeTodos = (cat) => {
@@ -1206,7 +1379,7 @@ function PlatosEditor() {
     const nombre = cat === 'ensaladas' ? 'las ensaladas' : 'las comidas';
     if (!confirm(`¿Eliminar ${nombre} del menú (${total})? Se perderán sus textos e imágenes.`)) return;
     [1, 2].forEach((op) => {
-      (D.platos[cat][op] || []).forEach((p) => A.clearImage(`plato.${p.id}`));
+      (D.platos[cat][op] || []).forEach((p) => limpiarImagenesPlato(A, p));
       A.setOverrideArray(`platos.${cat}.${op}`, []);
     });
   };
@@ -1273,10 +1446,7 @@ function PlatosEditor() {
               <ImageField label="Imagen del plato" id={`plato.${p.id}`} autoNombre={p.nombre} autoCat={catTab} />
               <PlatoText cat={catTab} op={op} plato={p} field="nombre" />
               <PlatoText cat={catTab} op={op} plato={p} field="desc" multi />
-              <PlatoNumber cat={catTab} op={op} plato={p} field="precioOp1" label="Precio Porción Abundante" />
-              <PlatoNumber cat={catTab} op={op} plato={p} field="precioOp2" label="Precio Porción Liviana" />
-              <PlatoToggle cat={catTab} op={op} plato={p} field="op1Off" label="Deshabilitar Porción Abundante" />
-              <PlatoToggle cat={catTab} op={op} plato={p} field="op2Off" label="Deshabilitar Porción Liviana" />
+              <PlatoPorciones cat={catTab} op={op} plato={p} />
               <PlatoToggle cat={catTab} op={op} plato={p} field="agotado" label="Marcar como agotado" />
               <PlatoToggle cat={catTab} op={op} plato={p} field="oculto" label="Ocultar del menú" />
 
@@ -1453,12 +1623,30 @@ function PlatoNumber({ cat, op, plato, field, label = 'Precio' }) {
   );
 }
 
-function PlatoToggle({ cat, op, plato, field, label }) {
+function PlatoToggle({ cat, op, plato, field, label, labelField = null, labelPrefix = '' }) {
   const value = !!plato[field];
   return (
     <div className="pv-field" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-      <div>
-        <label className="pv-label" style={{ margin: 0 }}>{label}</label>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 4, minWidth: 0, flex: 1 }}>
+        {labelField ? (
+          <>
+            {labelPrefix && <span className="pv-label" style={{ margin: 0, flexShrink: 0 }}>{labelPrefix}</span>}
+            <input
+              className="pv-input"
+              value={plato[labelField] ?? ''}
+              placeholder={label}
+              onChange={(e) => updatePlatoField(cat, op, plato.id, labelField, e.target.value)}
+              title="Editá el nombre de esta porción"
+              style={{
+                height: 30, padding: '0 8px', fontSize: 12, fontWeight: 500,
+                color: 'var(--tierra)', background: 'var(--crema)',
+                border: '1px dashed var(--crema-line)', borderRadius: 8, minWidth: 0,
+              }}
+            />
+          </>
+        ) : (
+          <label className="pv-label" style={{ margin: 0 }}>{label}</label>
+        )}
       </div>
       <button
         onClick={() => updatePlatoField(cat, op, plato.id, field, !value)}
@@ -1481,6 +1669,7 @@ function PlatoToggle({ cat, op, plato, field, label }) {
   );
 }
 
+// Una fila de opción de precio: nombre + precio + habilitar/deshabilitar (+ eliminar).
 function PlatoList({ cat, op, plato, field, label, addPlaceholder = 'Nuevo' }) {
   const items = plato[field] || [];
   const update = (newItems) => updatePlatoField(cat, op, plato.id, field, newItems);

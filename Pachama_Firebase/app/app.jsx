@@ -1,5 +1,21 @@
 // Pachama Viandas — app principal
 const { useState, useEffect, useMemo, useRef } = React;
+
+// Porciones de un plato: las dos base (op1/op2) + las extra creadas desde el panel.
+function porcionesDe(pl) {
+  const base = [
+    { key: 'op1', nombre: pl.op1Label || 'Porción Abundante', precio: pl.precioOp1 ?? pl.precio, off: !!pl.op1Off },
+    { key: 'op2', nombre: pl.op2Label || 'Porción Liviana', precio: pl.precioOp2 ?? pl.precio, off: !!pl.op2Off },
+  ];
+  const extra = (pl.porcionesExtra || []).map((x, i) => ({
+    key: 'ex' + (x.id ?? i),
+    nombre: x.nombre || 'Opción',
+    precio: Number(x.precio) || 0,
+    off: !!x.off,
+  }));
+  return [...base, ...extra];
+}
+window.porcionesDe = porcionesDe;
 // Reference admin module via getters — resolved at call time after all babel scripts load.
 const getAdmin = () => window.useAdmin();
 const Img = (props) => React.createElement(window.EditableImg, props);
@@ -423,10 +439,9 @@ function DishCard({ plato, onTap }) {
   const handleTap = agotado ? undefined : onTap;
   const wrapCls = `pv-card pv-card-tap${agotado ? ' pv-card-agotado' : ''}`;
 
-  const op1 = plato.precioOp1 ?? plato.precio;
-  const op2 = plato.precioOp2 ?? plato.precio;
-  const preciosDisp = [!plato.op1Off ? op1 : null, !plato.op2Off ? op2 : null].filter((x) => x != null);
-  const precioMenor = preciosDisp.length ? Math.min(...preciosDisp) : Math.min(op1, op2);
+  const porciones = (window.porcionesDe || porcionesDe)(plato);
+  const preciosDisp = porciones.filter((o) => !o.off).map((o) => o.precio);
+  const precioMenor = preciosDisp.length ? Math.min(...preciosDisp) : Math.min(...porciones.map((o) => o.precio));
   const hayDesc = window.descuentoPlatosVigente ? window.descuentoPlatosVigente() : false;
   const precioMenorFinal = window.aplicarDescuento ? window.aplicarDescuento(precioMenor) : precioMenor;
   const mostrarPrecio = agotado ? 'No disponible' : null;
@@ -716,25 +731,12 @@ function BebidasAddon({ seleccion, onSelect }) {
 
 // ── DETALLE ──
 function DetalleScreen({ state, go, cart, setCart }) {
-  // Leer el plato en tiempo real desde MENU_DATA para reflejar cambios del admin (op1Off, op2Off, etc.)
-  const A = useAdmin();
-  const snapshotPlato = state.plato;
-  const cat = state.categoria;
-  const livePlato = useMemo(() => {
-    const ops = [1, 2];
-    for (const op of ops) {
-      const arr = window.MENU_DATA?.platos?.[cat]?.[op] || [];
-      const found = arr.find(x => x.id === snapshotPlato?.id);
-      if (found) return found;
-    }
-    return snapshotPlato;
-  }, [A, snapshotPlato?.id, cat]);
-  const p = livePlato;
-  // Opciones de porción habilitadas desde el panel (op1Off / op2Off)
-  const opcionesDisp = [1, 2].filter((n) => !(n === 1 ? p.op1Off : p.op2Off));
+  const p = state.plato;
+  // Opciones de porción habilitadas desde el panel
+  const opcionesDisp = porcionesDe(p).filter((o) => !o.off);
   const [qty, setQty] = useState(1);
   // Si solo hay una porción habilitada, queda elegida por defecto
-  const [opcionElegida, setOpcionElegida] = useState(opcionesDisp.length === 1 ? opcionesDisp[0] : null);
+  const [opcionElegida, setOpcionElegida] = useState(opcionesDisp.length === 1 ? opcionesDisp[0].key : null);
   const [errorOpcion, setErrorOpcion] = useState(false);
   const [bebidaSel, setBebidaSel] = useState({});
   const compls = p.complementarios || [];
@@ -748,10 +750,11 @@ function DetalleScreen({ state, go, cart, setCart }) {
       setErrorOpcion(true);
       return;
     }
-    const precioBase = opcionElegida === 1 ? (p.precioOp1 ?? p.precio) : (p.precioOp2 ?? p.precio);
+    const opSel = opcionesDisp.find((o) => o.key === opcionElegida);
+    const precioBase = opSel ? opSel.precio : (p.precio ?? 0);
     const precioFinal = window.aplicarDescuento ? window.aplicarDescuento(precioBase) : precioBase;
     setCart((c) => {
-      const cartId = `${p.id}-op${opcionElegida}`;
+      const cartId = `${p.id}-${opcionElegida}`;
       const existing = c.find((it) => it.id === cartId && !it.custom);
       let next;
       if (existing) {
@@ -759,7 +762,7 @@ function DetalleScreen({ state, go, cart, setCart }) {
       } else {
         next = [...c, {
           id: cartId,
-          nombre: `${p.nombre} (${opcionElegida === 1 ? 'Porción Abundante' : 'Porción Liviana'})`,
+          nombre: `${p.nombre} (${opSel ? opSel.nombre : ''})`,
           precio: precioFinal,
           cantidad: qty,
         }];
@@ -771,10 +774,8 @@ function DetalleScreen({ state, go, cart, setCart }) {
 
   const hayDesc = window.descuentoPlatosVigente ? window.descuentoPlatosVigente() : false;
   const pctDesc = Number(window.MENU_DATA.home.descuentoPorcentaje) || 0;
-  const precioOp1 = p.precioOp1 ?? p.precio;
-  const precioOp2 = p.precioOp2 ?? p.precio;
-  const precioBaseMostrar = opcionElegida === 1 ? precioOp1 :
-    opcionElegida === 2 ? precioOp2 : null;
+  const porcionElegida = opcionesDisp.find((o) => o.key === opcionElegida) || null;
+  const precioBaseMostrar = porcionElegida ? porcionElegida.precio : null;
   const precioMostrar = precioBaseMostrar == null ? null : window.aplicarDescuento(precioBaseMostrar);
 
   return (
@@ -786,7 +787,8 @@ function DetalleScreen({ state, go, cart, setCart }) {
           background: 'var(--crema-deep)', borderRadius: 18, overflow: 'hidden',
         }}>
           <Img
-            id={`plato.${p.id}`}
+            id={opcionElegida ? `plato.${p.id}.${opcionElegida}` : `plato.${p.id}`}
+            fallbackId={`plato.${p.id}`}
             veg={true}
             style={{
               width: '100%', aspectRatio: '4 / 3',
@@ -842,13 +844,13 @@ function DetalleScreen({ state, go, cart, setCart }) {
         <div style={{ marginTop: 26 }}>
           <div className="pv-eyebrow" style={{ marginBottom: 8 }}>{opcionesDisp.length === 1 ? 'Porción' : 'Elegí una opción'}</div>
           <div style={{ display: 'grid', gridTemplateColumns: opcionesDisp.length === 1 ? '1fr' : '1fr 1fr', gap: 10 }}>
-            {opcionesDisp.map((n) => {
-              const sel = opcionElegida === n;
-              const precioN = n === 1 ? precioOp1 : precioOp2;
+            {opcionesDisp.map((o) => {
+              const sel = opcionElegida === o.key;
+              const precioN = o.precio;
               return (
                 <button
-                  key={n}
-                  onClick={() => { setOpcionElegida(n); setErrorOpcion(false); }}
+                  key={o.key}
+                  onClick={() => { setOpcionElegida(o.key); setErrorOpcion(false); }}
                   style={{
                     appearance: 'none', cursor: 'pointer', fontFamily: 'inherit',
                     padding: '14px 16px',
@@ -871,7 +873,7 @@ function DetalleScreen({ state, go, cart, setCart }) {
                     flexShrink: 0,
                   }} />
                   <span style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>
-                    <span style={{ fontWeight: 600, fontSize: 15 }}>{n === 1 ? 'Porción Abundante' : 'Porción Liviana'}</span>
+                    <span style={{ fontWeight: 600, fontSize: 15 }}>{o.nombre}</span>
                     {hayDesc ? (
                       <span style={{ fontSize: 13, fontWeight: 500, opacity: sel ? 0.95 : 0.8, display: 'flex', gap: 6, alignItems: 'baseline' }}>
                         <span style={{ textDecoration: 'line-through', opacity: 0.6 }}>{window.formatPrecio(precioN)}</span>
