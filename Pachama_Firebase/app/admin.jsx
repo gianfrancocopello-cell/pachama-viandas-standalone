@@ -1281,13 +1281,35 @@ function PlatoPorciones({ cat, op, plato }) {
     A.clearImage(`plato.${plato.id}.ex${it?.id ?? i}`);
     update(items.filter((_, j) => j !== i));
   };
+  const removeBase = (n) => {
+    if (!confirm('¿Eliminar esta opción de precio? También se borra su foto.')) return;
+    A.clearImage(`plato.${plato.id}.op${n}`);
+    updatePlatoField(cat, op, plato.id, n === 1 ? 'op1Borrada' : 'op2Borrada', true);
+  };
+  const total = items.length + (plato.op1Borrada ? 0 : 1) + (plato.op2Borrada ? 0 : 1);
+  const removeTodas = () => {
+    if (!confirm('¿Eliminar todas las opciones de precio de este plato, con sus fotos?')) return;
+    items.forEach((x, i) => A.clearImage(`plato.${plato.id}.ex${x.id ?? i}`));
+    A.clearImage(`plato.${plato.id}.op1`);
+    A.clearImage(`plato.${plato.id}.op2`);
+    updatePlatoFields(cat, op, plato.id, { porcionesExtra: [], op1Borrada: true, op2Borrada: true });
+  };
   return (
     <div className="pv-field">
       <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 6 }}>
-        <label className="pv-label" style={{ margin: 0 }}>Opciones de precio · {items.length + 2}</label>
+        <label className="pv-label" style={{ margin: 0 }}>Opciones de precio · {total}</label>
+        <button
+          onClick={removeTodas}
+          title="Eliminar todas las opciones extra y deshabilitar las dos base"
+          style={{
+            appearance: 'none', cursor: 'pointer', fontFamily: 'inherit',
+            border: '1px solid var(--crema-line)', background: 'transparent',
+            color: 'oklch(0.5 0.15 30)', padding: '4px 10px', borderRadius: 999,
+            fontSize: 10, fontWeight: 700, letterSpacing: '0.04em',
+          }}>Eliminar todas</button>
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-        <PorcionRow
+        {!plato.op1Borrada && <PorcionRow
           nombre={plato.op1Label ?? ''}
           placeholder="Porción Abundante"
           precio={plato.precioOp1 ?? plato.precio}
@@ -1297,8 +1319,9 @@ function PlatoPorciones({ cat, op, plato }) {
           onNombre={(v) => updatePlatoField(cat, op, plato.id, 'op1Label', v)}
           onPrecio={(v) => updatePlatoField(cat, op, plato.id, 'precioOp1', v)}
           onToggle={() => updatePlatoField(cat, op, plato.id, 'op1Off', !plato.op1Off)}
-        />
-        <PorcionRow
+          onRemove={() => removeBase(1)}
+        />}
+        {!plato.op2Borrada && <PorcionRow
           nombre={plato.op2Label ?? ''}
           placeholder="Porción Liviana"
           precio={plato.precioOp2 ?? plato.precio}
@@ -1308,7 +1331,8 @@ function PlatoPorciones({ cat, op, plato }) {
           onNombre={(v) => updatePlatoField(cat, op, plato.id, 'op2Label', v)}
           onPrecio={(v) => updatePlatoField(cat, op, plato.id, 'precioOp2', v)}
           onToggle={() => updatePlatoField(cat, op, plato.id, 'op2Off', !plato.op2Off)}
-        />
+          onRemove={() => removeBase(2)}
+        />}
         {items.map((x, j) => (
           <PorcionRow
             key={x.id ?? j}
@@ -1325,6 +1349,11 @@ function PlatoPorciones({ cat, op, plato }) {
           />
         ))}
       </div>
+      {total === 0 && (
+        <div style={{ fontSize: 11, color: 'var(--tierra-soft)', padding: '10px 12px', border: '1px dashed var(--crema-line)', borderRadius: 12 }}>
+          Este plato quedó sin opciones de precio: el cliente no puede agregarlo al pedido.
+        </div>
+      )}
       <button
         onClick={add}
         style={{

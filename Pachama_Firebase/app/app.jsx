@@ -4,9 +4,9 @@ const { useState, useEffect, useMemo, useRef } = React;
 // Porciones de un plato: las dos base (op1/op2) + las extra creadas desde el panel.
 function porcionesDe(pl) {
   const base = [
-    { key: 'op1', nombre: pl.op1Label || 'Porción Abundante', precio: pl.precioOp1 ?? pl.precio, off: !!pl.op1Off },
-    { key: 'op2', nombre: pl.op2Label || 'Porción Liviana', precio: pl.precioOp2 ?? pl.precio, off: !!pl.op2Off },
-  ];
+    !pl.op1Borrada && { key: 'op1', nombre: pl.op1Label || 'Porción Abundante', precio: pl.precioOp1 ?? pl.precio, off: !!pl.op1Off },
+    !pl.op2Borrada && { key: 'op2', nombre: pl.op2Label || 'Porción Liviana', precio: pl.precioOp2 ?? pl.precio, off: !!pl.op2Off },
+  ].filter(Boolean);
   const extra = (pl.porcionesExtra || []).map((x, i) => ({
     key: 'ex' + (x.id ?? i),
     nombre: x.nombre || 'Opción',
@@ -441,7 +441,9 @@ function DishCard({ plato, onTap }) {
 
   const porciones = (window.porcionesDe || porcionesDe)(plato);
   const preciosDisp = porciones.filter((o) => !o.off).map((o) => o.precio);
-  const precioMenor = preciosDisp.length ? Math.min(...preciosDisp) : Math.min(...porciones.map((o) => o.precio));
+  const precioMenor = preciosDisp.length ? Math.min(...preciosDisp)
+    : porciones.length ? Math.min(...porciones.map((o) => o.precio))
+    : (plato.precio ?? 0);
   const hayDesc = window.descuentoPlatosVigente ? window.descuentoPlatosVigente() : false;
   const precioMenorFinal = window.aplicarDescuento ? window.aplicarDescuento(precioMenor) : precioMenor;
   const mostrarPrecio = agotado ? 'No disponible' : null;
